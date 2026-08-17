@@ -1,4 +1,5 @@
 export type MealType = "breakfast" | "lunch" | "dinner";
+export type DiaryMealType = MealType | "snack";
 
 export interface Nutrition {
   calories: number;
@@ -25,6 +26,7 @@ export interface Meal {
   instructions: string[];
   cookingTimeMinutes: number;
   difficulty: "easy" | "medium" | "hard";
+  status?: "recommended";
 }
 
 export interface MealPlanDay {
@@ -49,9 +51,32 @@ export interface MealPlan {
 export interface PlannedMeal {
   id: string;
   recipeId: string;
+  recipeName: string;
   date: string;
   mealType: MealType;
-  completed: boolean;
+  nutrition: Nutrition;
+  status: "planned";
+}
+
+export interface FoodEntry {
+  id: string;
+  date: string;
+  mealType: DiaryMealType;
+  foodId?: string;
+  foodName: string;
+  manufacturer?: string;
+  amount: number;
+  unit: string;
+  nutrition: Nutrition;
+  source: "public-api" | "user-created" | "mock" | "recipe";
+  status: "consumed";
+  createdAt: string;
+}
+
+export interface FoodUsage {
+  foodId: string;
+  count: number;
+  lastUsedAt: string;
 }
 
 const n = (calories: number, carbs: number, protein: number, fat: number): Nutrition => ({
@@ -66,6 +91,23 @@ export const mealTypeLabel: Record<MealType, string> = {
   lunch: "점심",
   dinner: "저녁",
 };
+
+export const diaryMealTypeLabel: Record<DiaryMealType, string> = {
+  ...mealTypeLabel,
+  snack: "간식",
+};
+
+export const zeroNutrition = (): Nutrition => ({ calories: 0, carbs: 0, protein: 0, fat: 0 });
+
+export const addNutrition = (items: Nutrition[]): Nutrition => items.reduce(
+  (total, item) => ({
+    calories: Math.round((total.calories + item.calories) * 10) / 10,
+    carbs: Math.round((total.carbs + item.carbs) * 10) / 10,
+    protein: Math.round((total.protein + item.protein) * 10) / 10,
+    fat: Math.round((total.fat + item.fat) * 10) / 10,
+  }),
+  zeroNutrition(),
+);
 
 export const mockMealPlan: MealPlan = {
   days: [
