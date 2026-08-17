@@ -132,6 +132,23 @@ function getOutputText(data: Record<string, unknown>) {
   return null;
 }
 
+function resolveModel(value: string | undefined) {
+  const configured = value?.trim();
+  return configured || "gpt-5.4-mini";
+}
+
+function getOpenAIError(body: string) {
+  try {
+    const parsed = JSON.parse(body) as { error?: { code?: string; message?: string; type?: string } };
+    return {
+      code: parsed.error?.code ?? parsed.error?.type ?? "unknown",
+      message: parsed.error?.message?.slice(0, 300) ?? "No error message",
+    };
+  } catch {
+    return { code: "unknown", message: body.slice(0, 300) || "Empty error response" };
+  }
+}
+
 export async function POST(request: Request) {
   let input: MealPlanRequest = {};
   try {
@@ -173,7 +190,7 @@ ${excludedMealNames.length ? `직전 추천 메뉴 이름: ${excludedMealNames.j
 
 정확히 3일, 매일 breakfast→lunch→dinner 순서로 3끼를 만드세요. 각 끼와 일일 합계는 목표의 약 ±10% 범위에서 현실적으로 맞추세요. 한국 마트에서 쉽게 구하는 재료를 쓰고, 닭고기·달걀·두부·양파·대파·채소처럼 여러 메뉴에 재사용할 수 있는 재료를 의도적으로 배치하세요. 9끼가 지나치게 반복되지는 않아야 합니다. 아침 25%, 점심 35%, 저녁 40% 정도로 열량을 분배하세요. 양은 1인분 기준으로 무리하지 않게 쓰고, 조리법은 짧고 실제로 실행 가능해야 합니다. 의료적 주장이나 치료 표현은 금지합니다. 영양 수치는 추정치로만 다루세요. id는 day1-breakfast 형식으로 고정하세요. emoji는 음식과 어울리는 이모지 하나를 사용하세요.`;
 
-  const model = process.env.OPENAI_MODEL || "gpt-5.6";
+  const model = resolveModel(process.env.OPENAI_MODEL);
   try {
     const response = await fetch("https://api.openai.com/v1/responses", {
       method: "POST",
@@ -193,8 +210,17 @@ ${excludedMealNames.length ? `직전 추천 메뉴 이름: ${excludedMealNames.j
       signal: AbortSignal.timeout(40_000),
     });
     if (!response.ok) {
+      const error = getOpenAIError(await response.text());
+      console.error("[meal-plan] OpenAI request rejected", {
+        status: response.status,
+        model,
+        code: error.code,
+        message: error.message,
+      });
       if (response.status === 401 || response.status === 403) return demoResponse("openai_auth");
       if (response.status === 429) return demoResponse("openai_rate_limit");
+      if (response.status === 404 || error.code === "model_not_found") return demoResponse("openai_model");
+      if (response.status === 400) return demoResponse("openai_bad_request");
       return demoResponse(`openai_http_${response.status}`);
     }
     const data = await response.json() as Record<string, unknown>;
@@ -211,7 +237,14 @@ ${excludedMealNames.length ? `직전 추천 메뉴 이름: ${excludedMealNames.j
       { mode: "live", model, plan },
       { headers: { "Cache-Control": "no-store" } },
     );
-  } catch {
+  } catch (error) {
+    const caught = error instanceof Error ? error : new Error(String(error));
+    console.error("[meal-plan] OpenAI request failed", {
+      model,
+      name: caught.name,
+      message: caught.message.slice(0, 300),
+    });
+    if (caught.name === "TimeoutError" || caught.name === "AbortError") return demoResponse("openai_timeout");
     return demoResponse("request_failed");
   }
 }

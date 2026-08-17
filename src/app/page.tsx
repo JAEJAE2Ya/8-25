@@ -57,6 +57,9 @@ function aiReasonMessage(reason: string | null) {
   if (reason === "missing_api_key") return "Vercel에 OPENAI_API_KEY가 없어 데모 식단을 표시했어요.";
   if (reason === "openai_auth") return "OpenAI API 키가 유효하지 않거나 권한이 없어요. Vercel 환경 변수를 확인해 주세요.";
   if (reason === "openai_rate_limit") return "OpenAI 사용 한도 또는 결제 상태 때문에 데모 식단을 표시했어요.";
+  if (reason === "openai_model") return "설정한 AI 모델 이름을 사용할 수 없어요. Vercel의 OPENAI_MODEL을 확인해 주세요.";
+  if (reason === "openai_bad_request") return "AI 요청 설정을 처리할 수 없어요. 배포된 코드와 모델 설정을 확인해 주세요.";
+  if (reason === "openai_timeout") return "AI 생성 시간이 길어져 데모 식단으로 전환했어요. 잠시 후 다시 시도해 주세요.";
   if (reason === "app_rate_limit") return "짧은 시간에 요청이 많았어요. 잠시 후 다시 시도해 주세요.";
   if (reason === "invalid_output") return "AI 응답 형식이 올바르지 않아 데모 식단을 표시했어요.";
   return "AI 요청을 완료하지 못해 데모 식단을 표시했어요. Vercel 로그에서 API 상태를 확인해 주세요.";
