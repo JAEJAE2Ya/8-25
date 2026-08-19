@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useRouter } from "next/navigation";
 import {
   addNutrition,
-  communitySeed,
   diaryMealTypeLabel,
   getAllMeals,
   getIngredientPurchaseUrl,
@@ -19,7 +19,7 @@ import {
   type Nutrition,
   type PlannedMeal,
 } from "@/lib/data";
-import { browserStorage } from "@/lib/storage";
+import { BackendError, backendFetch, toFood, toUserFood, type AuthUser, type BackendFood, type CommunityComment, type CommunityPost } from "@/lib/backend-api";
 import { rankFoods, scaleNutrition, type FoodSearchResult, type UserCreatedFood } from "@/services/food-search/types";
 
 type Screen = "home" | "ai" | "community" | "favorites" | "my" | "shopping" | "food-search" | "food-detail" | "meal-editor" | "create-food";
@@ -139,13 +139,20 @@ function Toast({ message }: { message: string }) {
 }
 
 export default function Home() {
+  const router = useRouter();
   const [screen, setScreen] = useState<Screen>("home");
   const [target, setTarget] = useState<Nutrition>(targetDefault);
   const [plan, setPlan] = useState<MealPlan | null>(null);
   const [selectedMeal, setSelectedMeal] = useState<Meal | null>(null);
   const [favorites, setFavorites] = useState<string[]>([]);
   const [scheduled, setScheduled] = useState<PlannedMeal[]>([]);
-  const [community, setCommunity] = useState(communitySeed);
+  const [community, setCommunity] = useState<CommunityPost[]>([]);
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
+  const [favoriteRecipeIds, setFavoriteRecipeIds] = useState<Record<string, string>>({});
+  const [comments, setComments] = useState<Record<string, CommunityComment[]>>({});
+  const [commentDrafts, setCommentDrafts] = useState<Record<string, string>>({});
+  const [openComments, setOpenComments] = useState<Record<string, boolean>>({});
+  const [communitySchedulePostId, setCommunitySchedulePostId] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState(0);
   const [preference, setPreference] = useState("한식");
@@ -181,52 +188,65 @@ export default function Home() {
   const activePlan = plan ?? mockMealPlan;
 
   useEffect(() => {
-    const restore = window.setTimeout(() => {
+    const restore = window.setTimeout(async () => {
       try {
-        const savedTarget = browserStorage.get<Nutrition | null>("mealfit-target", null);
-        const savedPlan = browserStorage.get<MealPlan | null>("mealfit-plan", null);
-        const savedFavorites = localStorage.getItem("mealfit-favorites");
-        const savedScheduled = browserStorage.get<Array<PlannedMeal & { completed?: boolean }>>("mealfit-scheduled", []);
         const savedAiMode = localStorage.getItem("mealfit-ai-mode");
         const savedAiReason = localStorage.getItem("mealfit-ai-reason");
         const savedAiModel = localStorage.getItem("mealfit-ai-model");
         const savedTargetMode = localStorage.getItem("mealfit-target-mode");
         const savedMacroRatio = localStorage.getItem("mealfit-macro-ratio");
-        if (savedTarget) {
-          setTarget(savedTarget);
-          setTargetDraft(toTargetDraft(savedTarget));
-        }
-        if (savedPlan) setPlan(savedPlan);
-        if (savedFavorites) setFavorites(JSON.parse(savedFavorites));
-        setEntries(browserStorage.get<FoodEntry[]>("mealfit-food-entries", []));
-        setFavoriteFoods(browserStorage.get<FoodSearchResult[]>("mealfit-favorite-foods", []));
-        setRecentFoods(browserStorage.get<RecentFood[]>("mealfit-recent-foods", []));
-        setUserFoods(browserStorage.get<UserCreatedFood[]>("mealfit-user-foods", []));
-        const restorePlan = savedPlan ?? mockMealPlan;
-        setScheduled(savedScheduled.map((item) => {
-          if (item.recipeName && item.nutrition && item.status === "planned") return item;
-          const recipe = getMeal(item.recipeId, restorePlan) ?? getMeal(item.recipeId);
-          return {
-            id: item.id,
-            recipeId: item.recipeId,
-            recipeName: recipe?.name ?? "추천 레시피",
-            date: item.date,
-            mealType: item.mealType,
-            nutrition: recipe?.nutrition ?? { calories: 0, carbs: 0, protein: 0, fat: 0 },
-            status: "planned" as const,
-          };
-        }));
         if (savedAiMode === "live" || savedAiMode === "demo") setAiMode(savedAiMode);
         if (savedAiReason) setAiReason(savedAiReason);
         if (savedAiModel) setAiModel(savedAiModel);
         if (savedTargetMode === "ratio" || savedTargetMode === "direct") setTargetInputMode(savedTargetMode);
         if (savedMacroRatio === "5:3:2" || savedMacroRatio === "4:4:2") setMacroRatio(savedMacroRatio);
-      } catch {
-        // A damaged browser cache should never block the demo.
+        const [{ user }, { profile }, favoriteFoodData, favoriteRecipeData, userFoodData, recentFoodData, communityData] = await Promise.all([
+          backendFetch<{ user: AuthUser }>("/api/auth/me"),
+          backendFetch<{ profile: { dailyCalories: number; carbsTarget: number; proteinTarget: number; fatTarget: number } }>("/api/profile/nutrition"),
+          backendFetch<{ foods: BackendFood[] }>("/api/favorites/foods"),
+          backendFetch<{ recipes: Array<Meal & { favoriteId: string; externalId?: string }> }>("/api/favorites/recipes"),
+          backendFetch<{ foods: BackendFood[] }>("/api/foods/user"),
+          backendFetch<{ foods: BackendFood[] }>("/api/foods/recent"),
+          backendFetch<{ posts: CommunityPost[] }>("/api/community/posts"),
+        ]);
+        setCurrentUser(user);
+        const profileTarget = { calories: profile.dailyCalories, carbs: profile.carbsTarget, protein: profile.proteinTarget, fat: profile.fatTarget };
+        setTarget(profileTarget);
+        setTargetDraft(toTargetDraft(profileTarget));
+        setFavoriteFoods(favoriteFoodData.foods.map(toFood));
+        setFavorites(favoriteRecipeData.recipes.map((recipe) => recipe.externalId ?? recipe.id));
+        setFavoriteRecipeIds(Object.fromEntries(favoriteRecipeData.recipes.map((recipe) => [recipe.externalId ?? recipe.id, recipe.favoriteId])));
+        setUserFoods(userFoodData.foods.map(toUserFood));
+        setRecentFoods(recentFoodData.foods.map((food, index) => ({ food: toFood(food), count: 1, lastUsedAt: new Date(Date.now() - index).toISOString() })));
+        setCommunity(communityData.posts);
+      } catch (error) {
+        if (error instanceof BackendError && error.status === 401) router.replace("/login");
+        else setToast("백엔드에 연결하지 못했어요. 서버 상태를 확인해 주세요.");
       }
     }, 0);
     return () => window.clearTimeout(restore);
-  }, []);
+  }, [router]);
+
+  useEffect(() => {
+    if (!currentUser) return;
+    let active = true;
+    Promise.all([
+      backendFetch<{ entries: FoodEntry[] }>(`/api/diary?date=${selectedDate}`),
+      backendFetch<{ plannedMeals: PlannedMeal[] }>(`/api/planned-meals?date=${selectedDate}`),
+    ]).then(([diary, planned]) => {
+      if (!active) return;
+      setEntries((items) => [...items.filter((item) => item.date !== selectedDate), ...diary.entries]);
+      setScheduled((items) => [...items.filter((item) => item.date !== selectedDate), ...planned.plannedMeals]);
+    }).catch(() => setToast("이 날짜의 식단을 불러오지 못했어요."));
+    return () => { active = false; };
+  }, [currentUser, selectedDate]);
+
+  useEffect(() => {
+    if (!currentUser || screen !== "community") return;
+    backendFetch<{ posts: CommunityPost[] }>("/api/community/posts")
+      .then((data) => setCommunity(data.posts))
+      .catch(() => setToast("커뮤니티를 새로 불러오지 못했어요."));
+  }, [currentUser, screen]);
 
   useEffect(() => {
     if (screen !== "food-search") return;
@@ -241,11 +261,9 @@ export default function Home() {
       }
       setSearching(true);
       try {
-        const response = await fetch(`/api/foods/search?q=${encodeURIComponent(query)}`, { signal: controller.signal, cache: "no-store" });
-        if (!response.ok) throw new Error("food_search_failed");
-        const data = await response.json() as { foods?: FoodSearchResult[]; warning?: string };
-        setSearchResults(rankFoods([...(data.foods ?? []), ...userFoods], query));
-        setSearchWarning(data.warning ? "공공 음식 정보를 불러오지 못해 목 데이터를 보여드려요." : "");
+        const data = await backendFetch<{ foods?: BackendFood[]; warning?: string }>(`/api/foods/search?q=${encodeURIComponent(query)}`, { signal: controller.signal });
+        setSearchResults(rankFoods([...(data.foods ?? []).map(toFood), ...userFoods], query));
+        setSearchWarning(data.warning ? "식약처 음식 정보를 불러오지 못해 직접 등록한 음식만 보여드려요." : "");
       } catch (error) {
         if (error instanceof DOMException && error.name === "AbortError") return;
         setSearchResults(rankFoods(userFoods, query));
@@ -272,10 +290,10 @@ export default function Home() {
     return () => window.clearTimeout(timer);
   }, [toast]);
 
-  const saveTarget = (next: Nutrition) => {
+  const saveTarget = async (next: Nutrition) => {
     setTarget(next);
     setTargetDraft(toTargetDraft(next));
-    localStorage.setItem("mealfit-target", JSON.stringify(next));
+    await backendFetch("/api/profile/nutrition", { method: "PATCH", body: JSON.stringify({ dailyCalories: next.calories, carbsTarget: next.carbs, proteinTarget: next.protein, fatTarget: next.fat }) });
   };
 
   const ratioCalories = Math.max(1, Number.parseInt(targetDraft.calories, 10) || target.calories);
@@ -291,7 +309,7 @@ export default function Home() {
     setTargetInputMode(nextMode);
   };
 
-  const commitTarget = () => {
+  const commitTarget = async () => {
     const next = targetInputMode === "ratio"
       ? ratioPreview
       : {
@@ -300,26 +318,50 @@ export default function Home() {
           protein: Math.max(0, Number.parseInt(targetDraft.protein, 10) || 0),
           fat: Math.max(0, Number.parseInt(targetDraft.fat, 10) || 0),
         };
-    saveTarget(next);
+    try {
+      await saveTarget(next);
+    } catch {
+      setToast("영양 목표를 저장하지 못했어요");
+      return;
+    }
     localStorage.setItem("mealfit-target-mode", targetInputMode);
     localStorage.setItem("mealfit-macro-ratio", macroRatio);
     setToast("영양 목표를 저장했어요");
     setScreen("home");
   };
 
-  const toggleFavorite = (mealId: string) => {
-    const next = favorites.includes(mealId) ? favorites.filter((id) => id !== mealId) : [...favorites, mealId];
-    setFavorites(next);
-    localStorage.setItem("mealfit-favorites", JSON.stringify(next));
-    setToast(next.includes(mealId) ? "즐겨찾기에 저장했어요" : "즐겨찾기에서 삭제했어요");
+  const toggleFavorite = async (mealId: string) => {
+    const meal = getMeal(mealId, activePlan) ?? getMeal(mealId);
+    if (!meal) return;
+    try {
+      if (favorites.includes(mealId)) {
+        const favoriteId = favoriteRecipeIds[mealId];
+        if (favoriteId) await backendFetch(`/api/favorites/recipes/${favoriteId}`, { method: "DELETE" });
+        setFavorites((items) => items.filter((id) => id !== mealId));
+        setFavoriteRecipeIds((items) => { const next = { ...items }; delete next[mealId]; return next; });
+        setToast("즐겨찾기에서 삭제했어요");
+      } else {
+        const data = await backendFetch<{ recipe: { favoriteId: string; id: string } }>("/api/favorites/recipes", { method: "POST", body: JSON.stringify(meal) });
+        setFavorites((items) => [...items, mealId]);
+        setFavoriteRecipeIds((items) => ({ ...items, [mealId]: data.recipe.favoriteId }));
+        setToast("즐겨찾기에 저장했어요");
+      }
+    } catch { setToast("즐겨찾기를 변경하지 못했어요"); }
   };
 
-  const toggleFavoriteFood = (food: FoodSearchResult) => {
+  const toggleFavoriteFood = async (food: FoodSearchResult) => {
     const exists = favoriteFoods.some((item) => item.id === food.id);
-    const next = exists ? favoriteFoods.filter((item) => item.id !== food.id) : [...favoriteFoods, food];
-    setFavoriteFoods(next);
-    browserStorage.set("mealfit-favorite-foods", next);
-    setToast(exists ? "즐겨찾는 음식에서 삭제했어요" : "즐겨찾는 음식에 저장했어요");
+    try {
+      if (exists) {
+        const favoriteId = (favoriteFoods.find((item) => item.id === food.id) as FoodSearchResult & { favoriteId?: string })?.favoriteId;
+        if (favoriteId) await backendFetch(`/api/favorites/foods/${favoriteId}`, { method: "DELETE" });
+        setFavoriteFoods((items) => items.filter((item) => item.id !== food.id));
+      } else {
+        const data = await backendFetch<{ food: BackendFood }>("/api/favorites/foods", { method: "POST", body: JSON.stringify({ id: food.id, name: food.name, manufacturer: food.manufacturer, referenceAmount: food.servingSize ?? 100, unit: food.servingUnit ?? "g", nutrition: food.nutrition, source: food.source }) });
+        setFavoriteFoods((items) => [...items, toFood(data.food)]);
+      }
+      setToast(exists ? "즐겨찾는 음식에서 삭제했어요" : "즐겨찾는 음식에 저장했어요");
+    } catch { setToast("음식 즐겨찾기를 변경하지 못했어요"); }
   };
 
   const selectFood = (food: FoodSearchResult) => {
@@ -348,7 +390,7 @@ export default function Home() {
     const baseAmount = selectedFood.servingSize ?? 100;
     const amount = Math.max(1, Number.parseFloat(selectedAmountText) || baseAmount);
     const entry: FoodEntry = {
-      id: globalThis.crypto?.randomUUID?.() ?? `food-${Date.now()}`,
+      id: `temp-${globalThis.crypto?.randomUUID?.() ?? Date.now()}`,
       date: selectedDate,
       mealType: activeMealType,
       foodId: selectedFood.id,
@@ -366,58 +408,40 @@ export default function Home() {
     setScreen("meal-editor");
   };
 
-  const saveMealEntries = () => {
-    const previousIds = new Set(entries.filter((entry) => entry.date === selectedDate && entry.mealType === activeMealType).map((entry) => entry.id));
-    const nextEntries = [
-      ...entries.filter((entry) => !(entry.date === selectedDate && entry.mealType === activeMealType)),
-      ...editingEntries,
-    ];
-    const newlyAdded = editingEntries.filter((entry) => !previousIds.has(entry.id) && entry.foodId);
-    let nextRecent = [...recentFoods];
-    newlyAdded.forEach((entry) => {
-      const food = [...searchResults, ...userFoods, ...favoriteFoods, ...recentFoods.map((item) => item.food)].find((item) => item.id === entry.foodId);
-      if (!food) return;
-      const existing = nextRecent.find((item) => item.food.id === food.id);
-      nextRecent = existing
-        ? nextRecent.map((item) => item.food.id === food.id ? { ...item, count: item.count + 1, lastUsedAt: entry.createdAt, food } : item)
-        : [{ food, count: 1, lastUsedAt: entry.createdAt }, ...nextRecent];
-    });
-    nextRecent.sort((a, b) => b.lastUsedAt.localeCompare(a.lastUsedAt));
-    setEntries(nextEntries);
-    setRecentFoods(nextRecent.slice(0, 20));
-    browserStorage.set("mealfit-food-entries", nextEntries);
-    browserStorage.set("mealfit-recent-foods", nextRecent.slice(0, 20));
-    setScreen("home");
-    setToast(`${diaryMealTypeLabel[activeMealType]} 기록을 저장했어요`);
+  const saveMealEntries = async () => {
+    const previous = entries.filter((entry) => entry.date === selectedDate && entry.mealType === activeMealType);
+    const keptIds = new Set(editingEntries.filter((entry) => !entry.id.startsWith("temp-")).map((entry) => entry.id));
+    try {
+      await Promise.all(previous.filter((entry) => !keptIds.has(entry.id)).map((entry) => backendFetch(`/api/diary/entries/${entry.id}`, { method: "DELETE" })));
+      await Promise.all(editingEntries.filter((entry) => entry.id.startsWith("temp-")).map((entry) => backendFetch("/api/diary/entries", { method: "POST", body: JSON.stringify(entry) })));
+      const diary = await backendFetch<{ entries: FoodEntry[] }>(`/api/diary?date=${selectedDate}`);
+      setEntries((items) => [...items.filter((item) => item.date !== selectedDate), ...diary.entries]);
+      const recents = await backendFetch<{ foods: BackendFood[] }>("/api/foods/recent");
+      setRecentFoods(recents.foods.map((food, index) => ({ food: toFood(food), count: 1, lastUsedAt: new Date(Date.now() - index).toISOString() })));
+      setScreen("home");
+      setToast(`${diaryMealTypeLabel[activeMealType]} 기록을 저장했어요`);
+    } catch { setToast("식사 기록을 저장하지 못했어요"); }
   };
 
-  const createUserFood = () => {
+  const createUserFood = async () => {
     const amount = Math.max(1, Number.parseFloat(userFoodDraft.amount) || 100);
     if (!userFoodDraft.name.trim()) {
       setToast("음식 이름을 입력해 주세요");
       return;
     }
-    const food: UserCreatedFood = {
-      id: `user-${Date.now()}`,
-      name: userFoodDraft.name.trim(),
-      category: "직접 등록",
-      referenceAmount: `${amount}${userFoodDraft.unit}`,
-      servingSize: amount,
-      servingUnit: userFoodDraft.unit,
-      nutrition: {
+    const nutrition = {
         calories: Math.max(0, Number.parseFloat(userFoodDraft.calories) || 0),
         carbs: Math.max(0, Number.parseFloat(userFoodDraft.carbs) || 0),
         protein: Math.max(0, Number.parseFloat(userFoodDraft.protein) || 0),
         fat: Math.max(0, Number.parseFloat(userFoodDraft.fat) || 0),
-      },
-      source: "user-created",
-      createdAt: new Date().toISOString(),
     };
-    const next = [...userFoods, food];
-    setUserFoods(next);
-    browserStorage.set("mealfit-user-foods", next);
-    setUserFoodDraft({ name: "", amount: "100", unit: "g", calories: "", carbs: "", protein: "", fat: "" });
-    selectFood(food);
+    try {
+      const data = await backendFetch<{ food: BackendFood }>("/api/foods/user", { method: "POST", body: JSON.stringify({ name: userFoodDraft.name.trim(), referenceAmount: amount, unit: userFoodDraft.unit, nutrition }) });
+      const food = toUserFood(data.food);
+      setUserFoods((items) => [food, ...items]);
+      setUserFoodDraft({ name: "", amount: "100", unit: "g", calories: "", carbs: "", protein: "", fat: "" });
+      selectFood(food);
+    } catch { setToast("직접 등록 음식을 저장하지 못했어요"); }
   };
 
   const generatePlan = async () => {
@@ -425,20 +449,14 @@ export default function Home() {
     setLoadingMessage(0);
     setAiReason(null);
     try {
-      const request = fetch("/api/meal-plan", {
+      const request = backendFetch<{ plan: MealPlan; mode: "live" | "demo"; model?: string; reason?: string }>("/api/ai/meal-plan", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        cache: "no-store",
         body: JSON.stringify({
           target,
           preferences: { cuisine: preference, goal, avoidFoods },
           excludeMealNames: plan ? getAllMeals(plan).map((meal) => meal.name) : [],
           variationSeed: globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`,
         }),
-      }).then(async (response) => {
-        const data = await response.json();
-        if (!response.ok) throw new Error(typeof data.reason === "string" ? data.reason : `http_${response.status}`);
-        return data;
       });
       const [data] = await Promise.all([request, new Promise((resolve) => setTimeout(resolve, 2300))]);
       const nextPlan = data.plan as MealPlan;
@@ -450,7 +468,6 @@ export default function Home() {
       setAiMode(nextMode);
       setAiReason(nextReason);
       setAiModel(nextModel);
-      localStorage.setItem("mealfit-plan", JSON.stringify(nextPlan));
       localStorage.setItem("mealfit-ai-mode", nextMode);
       if (nextReason) localStorage.setItem("mealfit-ai-reason", nextReason);
       else localStorage.removeItem("mealfit-ai-reason");
@@ -463,7 +480,6 @@ export default function Home() {
       setAiMode("demo");
       setAiReason(reason);
       setAiModel(null);
-      localStorage.setItem("mealfit-plan", JSON.stringify(mockMealPlan));
       localStorage.setItem("mealfit-ai-mode", "demo");
       localStorage.setItem("mealfit-ai-reason", reason);
       localStorage.removeItem("mealfit-ai-model");
@@ -473,50 +489,35 @@ export default function Home() {
     }
   };
 
-  const saveSchedule = () => {
+  const saveSchedule = async () => {
     if (!selectedMeal) return;
     const date = scheduleOffset === 3 ? customScheduleDate : isoDate(addDays(today, scheduleOffset));
-    const withoutSameSlot = scheduled.filter((item) => item.id !== editingPlannedId && !(item.date === date && item.mealType === scheduleType));
-    const next: PlannedMeal[] = [...withoutSameSlot, {
-      id: editingPlannedId ?? `${date}-${scheduleType}-${Date.now()}`,
-      recipeId: selectedMeal.id,
-      recipeName: selectedMeal.name,
-      date,
-      mealType: scheduleType,
-      nutrition: selectedMeal.nutrition,
-      status: "planned",
-    }];
-    setScheduled(next);
-    browserStorage.set("mealfit-scheduled", next);
-    setScheduleOpen(false);
-    setSelectedMeal(null);
-    setEditingPlannedId(null);
-    setSelectedDate(date);
-    setScreen("home");
-    setToast(`${date === isoDate(today) ? "오늘" : date} ${mealTypeLabel[scheduleType]}에 먹을 예정으로 등록했어요`);
+    try {
+      if (communitySchedulePostId) {
+        await backendFetch(`/api/community/posts/${communitySchedulePostId}/plan`, { method: "POST", body: JSON.stringify({ date, mealType: scheduleType }) });
+      } else {
+        const path = editingPlannedId ? `/api/planned-meals/${editingPlannedId}` : "/api/planned-meals";
+        await backendFetch(path, { method: editingPlannedId ? "PATCH" : "POST", body: JSON.stringify({ recipeId: selectedMeal.id, recipeName: selectedMeal.name, date, mealType: scheduleType, nutrition: selectedMeal.nutrition, recipe: selectedMeal }) });
+      }
+      const data = await backendFetch<{ plannedMeals: PlannedMeal[] }>(`/api/planned-meals?date=${date}`);
+      setScheduled((items) => [...items.filter((item) => item.date !== date), ...data.plannedMeals]);
+      setScheduleOpen(false);
+      setSelectedMeal(null);
+      setEditingPlannedId(null);
+      setCommunitySchedulePostId(null);
+      setSelectedDate(date);
+      setScreen("home");
+      setToast(`${date === isoDate(today) ? "오늘" : date} ${mealTypeLabel[scheduleType]}에 먹을 예정으로 등록했어요`);
+    } catch { setToast("예정 식단을 저장하지 못했어요"); }
   };
 
-  const markPlannedConsumed = (planned: PlannedMeal) => {
-    const consumed: FoodEntry = {
-      id: `recipe-${planned.id}`,
-      date: planned.date,
-      mealType: planned.mealType,
-      foodId: planned.recipeId,
-      foodName: planned.recipeName,
-      amount: 1,
-      unit: "인분",
-      nutrition: planned.nutrition,
-      source: "recipe",
-      status: "consumed",
-      createdAt: new Date().toISOString(),
-    };
-    const nextEntries = [...entries.filter((entry) => entry.id !== consumed.id), consumed];
-    const nextScheduled = scheduled.filter((item) => item.id !== planned.id);
-    setEntries(nextEntries);
-    setScheduled(nextScheduled);
-    browserStorage.set("mealfit-food-entries", nextEntries);
-    browserStorage.set("mealfit-scheduled", nextScheduled);
-    setToast(`${planned.recipeName}을 실제 섭취 기록으로 옮겼어요`);
+  const markPlannedConsumed = async (planned: PlannedMeal) => {
+    try {
+      const data = await backendFetch<{ entry: FoodEntry }>(`/api/planned-meals/${planned.id}/consume`, { method: "POST" });
+      setEntries((items) => [...items.filter((entry) => entry.id !== data.entry.id), data.entry]);
+      setScheduled((items) => items.filter((item) => item.id !== planned.id));
+      setToast(`${planned.recipeName}을 실제 섭취 기록으로 옮겼어요`);
+    } catch { setToast("섭취 기록으로 옮기지 못했어요"); }
   };
 
   const changePlannedMeal = (planned: PlannedMeal) => {
@@ -530,13 +531,97 @@ export default function Home() {
     setScheduleOpen(true);
   };
 
-  const shareMeal = (meal: Meal) => {
-    if (!community.some((post) => post.id === `mine-${meal.id}`)) {
-      setCommunity([{ id: `mine-${meal.id}`, userName: "나의 식단", avatar: "나", mealId: meal.id, comment: `${meal.name}, 오늘의 목표 영양소에 딱 맞게 맛있게 먹었어요!`, likes: 0, time: "방금" }, ...community]);
+  const shareMeal = async (meal: Meal) => {
+    try {
+      const data = await backendFetch<{ post: CommunityPost }>("/api/community/posts", { method: "POST", body: JSON.stringify({ mealName: meal.name, caption: `${meal.name}, 오늘의 목표 영양소에 딱 맞게 맛있게 먹었어요!`, nutrition: meal.nutrition, recipe: meal }) });
+      setCommunity((items) => [data.post, ...items]);
+      setSelectedMeal(null);
+      setScreen("community");
+      setToast("커뮤니티에 레시피를 공유했어요");
+    } catch { setToast("커뮤니티 공유에 실패했어요"); }
+  };
+
+  const shareFoodEntry = async (entry: FoodEntry) => {
+    try {
+      const data = await backendFetch<{ post: CommunityPost }>("/api/community/posts", { method: "POST", body: JSON.stringify({ foodEntryId: entry.id, caption: `${entry.foodName}, 오늘 맛있게 먹었어요!` }) });
+      setCommunity((items) => [data.post, ...items]);
+      setScreen("community");
+      setToast("먹은 식사를 커뮤니티에 공유했어요");
+    } catch { setToast("섭취 기록을 공유하지 못했어요"); }
+  };
+
+  const mealFromPost = (post: CommunityPost): Meal => post.recipe ?? {
+    id: `community-${post.id}`,
+    mealType: "dinner",
+    name: post.mealName,
+    description: post.caption,
+    emoji: "🍽️",
+    nutrition: post.nutrition,
+    tags: ["커뮤니티 식단"],
+    ingredients: [{ name: "공유한 식단", amount: "1인분", category: "other" }],
+    instructions: ["게시물 작성자의 식단을 참고해 취향에 맞게 준비해 보세요."],
+    cookingTimeMinutes: 10,
+    difficulty: "easy",
+  };
+
+  const toggleCommunityLike = async (post: CommunityPost) => {
+    try {
+      const result = await backendFetch<{ likeCount: number; likedByMe: boolean }>(`/api/community/posts/${post.id}/like`, { method: post.likedByMe ? "DELETE" : "POST" });
+      setCommunity((items) => items.map((item) => item.id === post.id ? { ...item, ...result } : item));
+    } catch { setToast("좋아요를 변경하지 못했어요"); }
+  };
+
+  const togglePostComments = async (post: CommunityPost) => {
+    const opening = !openComments[post.id];
+    setOpenComments((items) => ({ ...items, [post.id]: opening }));
+    if (opening && !comments[post.id]) {
+      try {
+        const data = await backendFetch<{ comments: CommunityComment[] }>(`/api/community/posts/${post.id}/comments`);
+        setComments((items) => ({ ...items, [post.id]: data.comments }));
+      } catch { setToast("댓글을 불러오지 못했어요"); }
     }
-    setSelectedMeal(null);
-    setScreen("community");
-    setToast("커뮤니티에 레시피를 공유했어요");
+  };
+
+  const addComment = async (post: CommunityPost) => {
+    const content = commentDrafts[post.id]?.trim();
+    if (!content) return;
+    try {
+      const data = await backendFetch<{ comment: CommunityComment }>(`/api/community/posts/${post.id}/comments`, { method: "POST", body: JSON.stringify({ content }) });
+      setComments((items) => ({ ...items, [post.id]: [...(items[post.id] ?? []), data.comment] }));
+      setCommentDrafts((items) => ({ ...items, [post.id]: "" }));
+      setCommunity((items) => items.map((item) => item.id === post.id ? { ...item, commentCount: item.commentCount + 1 } : item));
+    } catch { setToast("댓글을 등록하지 못했어요"); }
+  };
+
+  const deleteComment = async (postId: string, commentId: string) => {
+    try {
+      await backendFetch(`/api/community/comments/${commentId}`, { method: "DELETE" });
+      setComments((items) => ({ ...items, [postId]: (items[postId] ?? []).filter((comment) => comment.id !== commentId) }));
+      setCommunity((items) => items.map((item) => item.id === postId ? { ...item, commentCount: Math.max(0, item.commentCount - 1) } : item));
+    } catch { setToast("댓글을 삭제하지 못했어요"); }
+  };
+
+  const deleteCommunityPost = async (postId: string) => {
+    try {
+      await backendFetch(`/api/community/posts/${postId}`, { method: "DELETE" });
+      setCommunity((items) => items.filter((post) => post.id !== postId));
+      setToast("게시물을 삭제했어요");
+    } catch { setToast("게시물을 삭제하지 못했어요"); }
+  };
+
+  const planCommunityPost = (post: CommunityPost) => {
+    setSelectedMeal(mealFromPost(post));
+    setCommunitySchedulePostId(post.id);
+    setEditingPlannedId(null);
+    setScheduleOffset(1);
+    setScheduleType("dinner");
+    setScheduleOpen(true);
+  };
+
+  const logout = async () => {
+    await backendFetch("/api/auth/logout", { method: "POST" }).catch(() => undefined);
+    router.replace("/login");
+    router.refresh();
   };
 
   const openMeal = (meal: Meal) => setSelectedMeal(meal);
@@ -712,6 +797,7 @@ export default function Home() {
             <div className="section-heading"><h2>먹은 음식</h2><span>{editingEntries.length}개</span></div>
             {editingEntries.length ? editingEntries.map((entry) => <article key={entry.id}><div><span>{entry.manufacturer ?? "섭취 기록"}</span><h3>{entry.foodName}</h3><p>{entry.amount}{entry.unit} · 탄 {entry.nutrition.carbs}g · 단 {entry.nutrition.protein}g · 지 {entry.nutrition.fat}g</p></div><strong>{entry.nutrition.calories} kcal</strong><button onClick={() => setEditingEntries((current) => current.filter((item) => item.id !== entry.id))} aria-label={`${entry.foodName} 삭제`}>×</button></article>) : <div className="meal-editor-empty"><span>＋</span><p>아직 담은 음식이 없어요.</p></div>}
           </section>
+          {editingEntries.some((entry) => !entry.id.startsWith("temp-")) && <div className="entry-share-list">{editingEntries.filter((entry) => !entry.id.startsWith("temp-")).map((entry) => <button key={entry.id} className="outline-cta" onClick={() => shareFoodEntry(entry)}>♧ {entry.foodName} 커뮤니티에 공유</button>)}</div>}
           <div className="meal-editor-actions"><button className="outline-cta" onClick={() => startFoodSearch(activeMealType, true)}>＋ 음식 추가</button><button className="primary-cta compact" onClick={saveMealEntries}>수정 완료</button></div>
         </main>
       </>
@@ -841,14 +927,19 @@ export default function Home() {
         <div className="feed-filter"><button className="active">추천</button><button>최신</button><button>고단백</button><button>간편식</button></div>
         <div className="community-feed">
           {community.map((post) => {
-            const meal = getMeal(post.mealId, activePlan) ?? getMeal(post.mealId) ?? mockMealPlan.days[0].meals[0];
+            const meal = mealFromPost(post);
             return <article className="post-card" key={post.id}>
-              <div className="post-author"><span>{post.avatar}</span><div><strong>{post.userName}</strong><em>{post.time}</em></div><button aria-label="게시물 메뉴">•••</button></div>
-              <p>{post.comment}</p>
+              <div className="post-author"><span>{post.author.nickname.slice(0, 1)}</span><div><strong>{post.author.nickname}</strong><em>{new Date(post.createdAt).toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "numeric", minute: "2-digit" })}</em></div>{post.mine ? <button onClick={() => deleteCommunityPost(post.id)} aria-label="게시물 삭제">삭제</button> : <span />}</div>
+              <p>{post.caption}</p>
               <button className="post-meal" onClick={() => openMeal(meal)}><MealVisual meal={meal} large /><div><span>{mealTypeLabel[meal.mealType]} 추천</span><h3>{meal.name}</h3><strong>{meal.nutrition.calories} kcal</strong><MacroRow nutrition={meal.nutrition} compact /></div><b>›</b></button>
-              <div className="post-actions"><button onClick={() => setCommunity(community.map((item) => item.id === post.id ? { ...item, likes: item.likes + 1 } : item))}>♡ {post.likes}</button><button onClick={() => toggleFavorite(meal.id)}>▱ 저장</button><button onClick={() => openMeal(meal)}>레시피 보기 →</button></div>
+              <div className="post-actions"><button className={post.likedByMe ? "active" : ""} onClick={() => toggleCommunityLike(post)}>{post.likedByMe ? "♥" : "♡"} {post.likeCount}</button><button onClick={() => togglePostComments(post)}>댓글 {post.commentCount}</button><button onClick={() => planCommunityPost(post)}>나도 먹어볼래요 →</button></div>
+              {openComments[post.id] && <div className="post-comments">
+                {(comments[post.id] ?? []).map((comment) => <div key={comment.id}><span>{comment.author.nickname.slice(0, 1)}</span><p><b>{comment.author.nickname}</b>{comment.content}</p>{comment.mine && <button onClick={() => deleteComment(post.id, comment.id)}>삭제</button>}</div>)}
+                <form onSubmit={(event) => { event.preventDefault(); addComment(post); }}><input value={commentDrafts[post.id] ?? ""} onChange={(event) => setCommentDrafts((items) => ({ ...items, [post.id]: event.target.value }))} placeholder="따뜻한 댓글을 남겨 주세요" maxLength={1000} /><button>등록</button></form>
+              </div>}
             </article>;
           })}
+          {!community.length && <div className="compact-empty"><p>아직 공유된 식단이 없어요.</p><span>첫 식단을 공유해 보세요.</span></div>}
         </div>
       </main>
     </>
@@ -878,7 +969,7 @@ export default function Home() {
     <>
       <Header title="나의 목표" eyebrow="MY NUTRITION" />
       <main className="screen-content my-content">
-        <section className="profile-card"><div className="profile-avatar">M<span>✦</span></div><div><span>오늘도 꾸준한</span><h2>밀핏 챌린저</h2><p>식단을 시작한 지 12일째예요</p></div></section>
+        <section className="profile-card"><div className="profile-avatar">{currentUser?.nickname.slice(0, 1) ?? "M"}<span>✦</span></div><div><span>오늘도 꾸준한</span><h2>{currentUser?.nickname ?? "밀핏 챌린저"}</h2><p>{currentUser?.email ?? "내 식단을 안전하게 저장하고 있어요"}</p></div></section>
         <section className="settings-card">
           <div className="section-heading"><div><span className="section-kicker">DAILY TARGET</span><h2>하루 영양 목표</h2></div></div>
           <div className="target-input-tabs" role="tablist" aria-label="영양 목표 입력 방식">
@@ -916,7 +1007,7 @@ export default function Home() {
           )}
           <button className="primary-cta compact" onClick={commitTarget}>목표 저장하기</button>
         </section>
-        <section className="settings-list"><button><span>🥬</span><div><b>선호 식단</b><em>한식 · 고단백</em></div><i>›</i></button><button><span>⚑</span><div><b>알레르기 및 제외 식품</b><em>설정 안 함</em></div><i>›</i></button><button><span>↻</span><div><b>데모 데이터 초기화</b><em>저장된 식단과 즐겨찾기 삭제</em></div><i>›</i></button></section>
+        <section className="settings-list"><button><span>🥬</span><div><b>선호 식단</b><em>한식 · 고단백</em></div><i>›</i></button><button><span>⚑</span><div><b>알레르기 및 제외 식품</b><em>비공개 프로필에 저장</em></div><i>›</i></button><button onClick={logout}><span>↪</span><div><b>로그아웃</b><em>다른 계정으로 전환하기</em></div><i>›</i></button></section>
       </main>
     </>
   );
@@ -957,7 +1048,7 @@ export default function Home() {
                 <section className="recipe-section instructions"><div className="section-heading"><h3>이렇게 만들어요</h3></div>{selectedMeal.instructions.map((instruction, index) => <div className="instruction-row" key={instruction}><span>{index + 1}</span><p>{instruction}</p></div>)}</section>
                 <p className="estimate-note centered">영양 정보는 재료와 조리법에 따른 추정치입니다.</p>
                 <div className="recipe-secondary-actions"><button onClick={() => toggleFavorite(selectedMeal.id)}>{favorites.includes(selectedMeal.id) ? "♥ 저장됨" : "♡ 즐겨찾기"}</button><button onClick={() => shareMeal(selectedMeal)}>♧ 커뮤니티 공유</button></div>
-                <button className="primary-cta schedule-cta" onClick={() => { setEditingPlannedId(null); setScheduleOpen(true); }}>이 메뉴 먹을래요</button>
+                <button className="primary-cta schedule-cta" onClick={() => { setEditingPlannedId(null); setCommunitySchedulePostId(null); setScheduleOpen(true); }}>이 메뉴 먹을래요</button>
               </div>
             </div>
           </div>
@@ -965,10 +1056,10 @@ export default function Home() {
 
         {scheduleOpen && selectedMeal && (
           <div className="modal-layer schedule-layer" role="dialog" aria-modal="true" aria-label="식단 일정 선택">
-            <button className="modal-scrim" onClick={() => setScheduleOpen(false)} aria-label="일정 창 닫기" />
+            <button className="modal-scrim" onClick={() => { setScheduleOpen(false); setCommunitySchedulePostId(null); }} aria-label="일정 창 닫기" />
             <div className="schedule-sheet">
               <div className="sheet-handle" />
-              <div className="sheet-heading"><div><span>식단에 추가</span><h2>언제 먹을까요?</h2></div><button onClick={() => setScheduleOpen(false)}>×</button></div>
+              <div className="sheet-heading"><div><span>식단에 추가</span><h2>언제 먹을까요?</h2></div><button onClick={() => { setScheduleOpen(false); setCommunitySchedulePostId(null); }}>×</button></div>
               <div className="selected-meal-chip"><span>{selectedMeal.emoji}</span><div><b>{selectedMeal.name}</b><em>{selectedMeal.nutrition.calories} kcal</em></div></div>
               <label className="sheet-label">날짜 선택</label>
               <div className="schedule-options date-options">{[0, 1, 2, 3].map((offset) => <button key={offset} onClick={() => setScheduleOffset(offset)} className={scheduleOffset === offset ? "active" : ""}><span>{dateChoiceLabel(offset)}</span><b>{offset === 3 ? "날짜" : shortDate(addDays(today, offset))}</b></button>)}</div>

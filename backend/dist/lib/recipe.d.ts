@@ -1,0 +1,51 @@
+import { Prisma, type PrismaClient } from "@prisma/client";
+type RecipeDb = PrismaClient | Prisma.TransactionClient;
+export declare function persistRecipe(db: RecipeDb, ownerId: string, value: unknown): Promise<{
+    name: string;
+    id: string;
+    createdAt: Date;
+    calories: number;
+    carbs: number;
+    protein: number;
+    fat: number;
+    ownerId: string | null;
+    externalId: string | null;
+    description: string;
+    cookingTime: number;
+    difficulty: import("@prisma/client").$Enums.RecipeDifficulty;
+    ingredients: Prisma.JsonValue;
+    instructions: Prisma.JsonValue;
+}>;
+export declare function recipeDto(recipe: {
+    id: string;
+    externalId: string | null;
+    name: string;
+    description: string;
+    calories: number;
+    carbs: number;
+    protein: number;
+    fat: number;
+    cookingTime: number;
+    difficulty: "easy" | "medium" | "hard";
+    ingredients: Prisma.JsonValue;
+    instructions: Prisma.JsonValue;
+}): {
+    id: string;
+    databaseId: string;
+    mealType: "dinner";
+    name: string;
+    description: string;
+    emoji: string;
+    nutrition: {
+        calories: number;
+        carbs: number;
+        protein: number;
+        fat: number;
+    };
+    tags: string[];
+    ingredients: Prisma.JsonValue;
+    instructions: Prisma.JsonValue;
+    cookingTimeMinutes: number;
+    difficulty: "easy" | "medium" | "hard";
+};
+export {};

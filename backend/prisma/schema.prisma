@@ -1,0 +1,229 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum MealType {
+  breakfast
+  lunch
+  dinner
+  snack
+}
+
+enum RecipeDifficulty {
+  easy
+  medium
+  hard
+}
+
+model User {
+  id                String                @id @default(cuid())
+  email             String                @unique
+  passwordHash      String
+  nickname          String                @unique
+  avatarUrl         String?
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+  sessions          Session[]
+  nutritionProfile  UserNutritionProfile?
+  foodEntries       FoodEntry[]
+  plannedMeals      PlannedMeal[]
+  recipes           Recipe[]
+  favoriteFoods     FavoriteFood[]
+  favoriteRecipes   FavoriteRecipe[]
+  userFoods         UserFood[]
+  communityPosts    CommunityPost[]
+  communityLikes    CommunityLike[]
+  communityComments CommunityComment[]
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  tokenHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model UserNutritionProfile {
+  userId          String   @id
+  dailyCalories   Int      @default(2000)
+  carbsTarget     Float    @default(250)
+  proteinTarget   Float    @default(150)
+  fatTarget       Float    @default(44)
+  allergies       String?
+  foodPreferences String?
+  updatedAt       DateTime @updatedAt
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model FoodEntry {
+  id             String          @id @default(cuid())
+  userId         String
+  date           DateTime        @db.Date
+  mealType       MealType
+  foodIdentifier String?
+  foodName       String
+  manufacturer   String?
+  servingAmount  Float
+  servingUnit    String
+  calories       Float
+  carbs          Float
+  protein        Float
+  fat            Float
+  source         String
+  createdAt      DateTime        @default(now())
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  communityPosts CommunityPost[]
+
+  @@index([userId, date])
+  @@index([userId, foodIdentifier, createdAt])
+}
+
+model PlannedMeal {
+  id               String   @id @default(cuid())
+  userId           String
+  recipeId         String?
+  recipeExternalId String?
+  recipeName       String
+  date             DateTime @db.Date
+  mealType         MealType
+  calories         Float
+  carbs             Float
+  protein          Float
+  fat              Float
+  createdAt        DateTime @default(now())
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  recipe           Recipe?  @relation(fields: [recipeId], references: [id], onDelete: SetNull)
+
+  @@index([userId, date])
+}
+
+model Recipe {
+  id              String           @id @default(cuid())
+  ownerId         String?
+  externalId      String?
+  name            String
+  description     String
+  calories        Float
+  carbs           Float
+  protein         Float
+  fat             Float
+  cookingTime     Int
+  difficulty      RecipeDifficulty
+  ingredients     Json
+  instructions    Json
+  createdAt       DateTime         @default(now())
+  owner           User?            @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+  plannedMeals    PlannedMeal[]
+  favoriteRecipes FavoriteRecipe[]
+  communityPosts  CommunityPost[]
+
+  @@index([ownerId, externalId])
+}
+
+model FavoriteFood {
+  id              String   @id @default(cuid())
+  userId          String
+  foodIdentifier  String
+  foodName        String
+  manufacturer    String?
+  referenceAmount Float
+  servingUnit     String
+  calories        Float
+  carbs           Float
+  protein         Float
+  fat             Float
+  source          String
+  createdAt       DateTime @default(now())
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, foodIdentifier])
+  @@index([userId, createdAt])
+}
+
+model FavoriteRecipe {
+  id        String   @id @default(cuid())
+  userId    String
+  recipeId  String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  recipe    Recipe   @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, recipeId])
+  @@index([userId, createdAt])
+}
+
+model UserFood {
+  id              String   @id @default(cuid())
+  userId          String
+  name            String
+  manufacturer    String?
+  referenceAmount Float
+  servingUnit     String
+  calories        Float
+  carbs           Float
+  protein         Float
+  fat             Float
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, name])
+}
+
+model CommunityPost {
+  id          String             @id @default(cuid())
+  authorId    String
+  recipeId    String?
+  foodEntryId String?
+  mealName    String
+  caption     String
+  imageUrl    String?
+  calories    Float?
+  carbs       Float?
+  protein     Float?
+  fat         Float?
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  author      User               @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  recipe      Recipe?            @relation(fields: [recipeId], references: [id], onDelete: SetNull)
+  foodEntry   FoodEntry?         @relation(fields: [foodEntryId], references: [id], onDelete: SetNull)
+  likes       CommunityLike[]
+  comments    CommunityComment[]
+
+  @@index([createdAt])
+  @@index([authorId, createdAt])
+}
+
+model CommunityLike {
+  userId    String
+  postId    String
+  createdAt DateTime      @default(now())
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post      CommunityPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@id([userId, postId])
+  @@index([postId])
+}
+
+model CommunityComment {
+  id        String        @id @default(cuid())
+  userId    String
+  postId    String
+  content   String
+  createdAt DateTime      @default(now())
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post      CommunityPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@index([postId, createdAt])
+  @@index([userId])
+}

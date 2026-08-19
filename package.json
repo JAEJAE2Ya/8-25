@@ -6,7 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "backend:dev": "pnpm --dir backend dev",
+    "backend:build": "pnpm --dir backend build",
+    "backend:test": "pnpm --dir backend test"
   },
   "dependencies": {
     "next": "16.3.1",

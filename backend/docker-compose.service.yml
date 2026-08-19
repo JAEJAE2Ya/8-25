@@ -1,0 +1,21 @@
+services:
+  mealfit-backend:
+    build:
+      # Paths assume this service is merged into the repository-root Compose file.
+      context: .
+      dockerfile: backend/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env
+    environment:
+      DATABASE_URL: postgresql://mealfit:${POSTGRES_PASSWORD}@postgres:5432/mealfit
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "3001:3001"
+    networks:
+      - mealfit
+
+# Merge this service into the existing Compose file that already defines
+# `postgres` and the `mealfit` network. Do not publish PostgreSQL port 5432.

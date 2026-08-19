@@ -13,6 +13,21 @@
   --cream: #f1f4e8;
 }
 
+/* Authentication keeps the same compact, mobile-first Mealfit visual language. */
+.auth-page { min-height: 100dvh; display: grid; place-items: center; padding: 24px; background: #edf0e9; color: #173b2b; }
+.auth-card { width: min(100%, 430px); padding: 42px 28px 32px; border-radius: 32px; background: rgba(255,255,255,.94); box-shadow: 0 24px 80px rgba(28,58,41,.13); }
+.auth-logo { display: grid; place-items: center; width: 48px; height: 48px; margin-bottom: 26px; border-radius: 15px; background: #174f38; color: #dfff75; font: 800 28px/1 Georgia, serif; }
+.auth-card h1 { margin: 7px 0 8px; font-size: 29px; letter-spacing: -.05em; }
+.auth-card > p { margin: 0 0 28px; color: #738077; font-size: 14px; }
+.auth-card form { display: grid; gap: 16px; }
+.auth-card label { display: grid; gap: 7px; color: #4d6055; font-size: 13px; font-weight: 700; }
+.auth-card input { width: 100%; padding: 15px 16px; border: 1px solid #dbe2dc; border-radius: 14px; outline: 0; background: #fbfcfa; color: #173b2b; font-size: 16px; }
+.auth-card input:focus { border-color: #3a7459; box-shadow: 0 0 0 3px rgba(58,116,89,.12); }
+.auth-card button:disabled { cursor: wait; opacity: .65; }
+.auth-error { padding: 12px 14px; border-radius: 12px; background: #fff1ed; color: #a33b26; font-size: 13px; }
+.auth-switch { margin-top: 22px; text-align: center; color: #7a867e; font-size: 13px; }
+.auth-switch a { color: #174f38; font-weight: 800; }
+
 * { box-sizing: border-box; }
 html { background: #e8ebe5; }
 body {
@@ -657,6 +672,18 @@ a { color: inherit; text-decoration: none; }
 .bottom-nav .ai-nav.active span { background: var(--green); color: var(--lime); box-shadow: 0 5px 12px rgba(22,63,45,.2); }
 .toast { position: fixed; z-index: 80; right: 20px; bottom: 94px; left: 20px; display: flex; width: calc(100% - 40px); max-width: 440px; min-height: 49px; align-items: center; gap: 10px; margin: 0 auto; padding: 11px 15px; border-radius: 14px; background: #17271f; color: white; box-shadow: 0 12px 32px rgba(18,36,26,.24); font-size: 11px; font-weight: 700; animation: toastIn .25s ease-out; }
 .toast span { display: grid; width: 24px; height: 24px; place-items: center; border-radius: 8px; background: var(--lime); color: var(--green); }
+.post-actions button.active { color: #b93348; }
+.post-author img { width: 100%; height: 100%; border-radius: inherit; object-fit: cover; }
+.post-comments { margin-top: 12px; padding-top: 12px; border-top: 1px solid #edf0ec; }
+.post-comments > div { display: flex; align-items: flex-start; gap: 8px; padding: 8px 0; }
+.post-comments > div > span { display: grid; width: 25px; height: 25px; flex: 0 0 auto; place-items: center; border-radius: 9px; background: #e8eee3; color: var(--green); font-size: 10px; font-weight: 900; }
+.post-comments > div p { flex: 1; margin: 0; color: #59675e; font-size: 10px; line-height: 1.55; }
+.post-comments > div p b { display: block; color: var(--ink); }
+.post-comments > div button { border: 0; background: transparent; color: #9a6d6d; font-size: 9px; cursor: pointer; }
+.post-comments form { display: flex; gap: 7px; margin-top: 8px; }
+.post-comments input { min-width: 0; flex: 1; padding: 10px 12px; border: 1px solid #dfe5df; border-radius: 11px; outline: 0; font-size: 10px; }
+.post-comments form button { padding: 0 13px; border: 0; border-radius: 11px; background: var(--green); color: white; font-size: 10px; font-weight: 800; }
+.entry-share-list { display: grid; gap: 8px; margin-bottom: 10px; }
 @keyframes toastIn { from { opacity: 0; transform: translateY(10px); } }
 
 @media (max-width: 370px) {
