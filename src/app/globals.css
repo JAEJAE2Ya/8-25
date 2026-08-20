@@ -450,7 +450,7 @@ a { color: inherit; text-decoration: none; }
 .meal-editor-empty p { margin: 9px 0 0; font-size: 9px; }
 .entry-share-list .outline-cta { margin-top: 0; }
 .meal-editor-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin-top: 17px; }
-.meal-editor-actions .outline-cta, .meal-editor-actions .primary-cta { height: 50px; margin-top: 0; }
+.meal-editor-actions > .outline-cta, .meal-editor-actions > .primary-cta.compact { height: 50px; align-self: stretch; margin: 0; }
 .create-food-card { padding: 20px; border: 1px solid #e1e5df; border-radius: 22px; background: white; }
 .create-food-card > label, .create-food-grid label { display: flex; min-height: 58px; align-items: center; justify-content: space-between; border-bottom: 1px solid #edf0ec; }
 .create-food-card label > span { color: #68746b; font-size: 10px; font-weight: 800; }
