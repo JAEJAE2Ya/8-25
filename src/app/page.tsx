@@ -212,7 +212,7 @@ export default function Home() {
   const [toast, setToast] = useState("");
   const [aiMode, setAiMode] = useState<"live" | "demo" | null>(null);
   const [aiReason, setAiReason] = useState<string | null>(null);
-  const [aiModel, setAiModel] = useState<string | null>(null);
+  const [, setAiModel] = useState<string | null>(null);
   const [targetInputMode, setTargetInputMode] = useState<TargetInputMode>("ratio");
   const [macroRatio, setMacroRatio] = useState<MacroRatio>("5:3:2");
   const [targetDraft, setTargetDraft] = useState<TargetDraft>(() => toTargetDraft(targetDefault));
@@ -532,7 +532,7 @@ export default function Home() {
       else localStorage.removeItem("mealfit-ai-reason");
       if (nextModel) localStorage.setItem("mealfit-ai-model", nextModel);
       else localStorage.removeItem("mealfit-ai-model");
-      if (nextMode === "demo") setToast(aiReasonMessage(nextReason));
+      setToast(nextMode === "live" ? "AI 연결 성공" : aiReasonMessage(nextReason));
     } catch (error) {
       const reason = error instanceof Error ? error.message : "client_request_failed";
       const hasExclusions = avoidFoods.trim().length > 0;
@@ -960,12 +960,12 @@ export default function Home() {
               <h2>다음 3일의 식사가<br />준비됐어요</h2>
               <p>목표 영양과 장보기 효율을 함께 맞췄어요.</p>
             </div>
-            {aiMode && (
-              <div className={`ai-connection-status ${aiMode}`} role="status">
-                <span>{aiMode === "live" ? "✓" : "!"}</span>
+            {aiMode === "demo" && (
+              <div className="ai-connection-status demo" role="status">
+                <span>!</span>
                 <div>
-                  <strong>{aiMode === "live" ? "OpenAI 연결됨" : "현재 데모 모드"}</strong>
-                  <p>{aiMode === "live" ? `${aiModel ?? "설정된 모델"}로 새 식단을 생성했어요.` : aiReasonMessage(aiReason)}</p>
+                  <strong>현재 데모 모드</strong>
+                  <p>{aiReasonMessage(aiReason)}</p>
                 </div>
               </div>
             )}
