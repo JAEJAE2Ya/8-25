@@ -91,6 +91,29 @@ const loadingMessages = [
   "3일치 아침·점심·저녁을 조합하고 있어요",
 ];
 
+const encouragementMessages = [
+  "오늘 한 끼를 챙긴 것만으로도 충분히 잘했어요.",
+  "완벽한 식단보다 오래 가는 식단이 더 멋져요.",
+  "맛있게 먹고 꾸준히 기록하면 그걸로 충분해요.",
+  "천천히 가도 방향이 맞으면 잘하고 있는 거예요.",
+  "오늘의 작은 기록이 큰 변화를 만들어요.",
+  "먹는 즐거움도 건강한 식단의 일부예요.",
+  "어제보다 한 끼만 더 잘 챙겨도 성공이에요.",
+  "몸을 위한 선택에 정답은 하나가 아니에요.",
+  "오늘도 나를 돌보는 중이에요.",
+  "균형은 하루가 아니라 여러 날에 걸쳐 만들어져요.",
+  "좋아하는 음식과 건강은 함께 갈 수 있어요.",
+  "배고픔을 참는 것보다 잘 챙겨 먹는 게 중요해요.",
+  "지금의 꾸준함이 이미 큰 성과예요.",
+  "식단은 벌이 아니라 나를 위한 계획이에요.",
+  "기록을 놓친 날이 있어도 다시 시작하면 돼요.",
+  "한 끼의 아쉬움보다 다음 한 끼의 선택이 더 중요해요.",
+  "오늘의 나에게 필요한 만큼 잘 먹어주세요.",
+  "비교하지 않아도 충분히 잘 가고 있어요.",
+  "작은 선택이 모여 나만의 좋은 리듬이 돼요.",
+  "오늘도 밀핏이 당신의 한 끼를 응원해요.",
+] as const;
+
 const navItems: Array<{ id: Screen; icon: string; label: string }> = [
   { id: "home", icon: "⌂", label: "기록" },
   { id: "ai", icon: "✦", label: "AI 추천" },
@@ -137,7 +160,7 @@ function MealTypeIcon({ type, size }: { type: DiaryMealType; size: number }) {
   return <Image className="meal-type-icon-image" src={mealIconSrc[type]} alt="" width={size} height={size} />;
 }
 
-function Header({ title, eyebrow, onBack, action }: { title: React.ReactNode; eyebrow?: string; onBack?: () => void; action?: React.ReactNode }) {
+function Header({ title, eyebrow, onBack, action, onEncouragement }: { title: React.ReactNode; eyebrow?: string; onBack?: () => void; action?: React.ReactNode; onEncouragement?: () => void }) {
   return (
     <header className="top-header">
       <div>
@@ -147,7 +170,7 @@ function Header({ title, eyebrow, onBack, action }: { title: React.ReactNode; ey
         {eyebrow && <span>{eyebrow}</span>}
         <h1>{title}</h1>
       </div>
-      <div className="header-action">{action ?? <button className="icon-button" aria-label="알림">◌<i /></button>}</div>
+      <div className="header-action">{action ?? <button className="icon-button encouragement-button" type="button" onClick={onEncouragement} aria-label="오늘의 응원 한마디 보기">◌<i /></button>}</div>
     </header>
   );
 }
@@ -159,6 +182,10 @@ function MealVisual({ meal, large = false }: { meal: Meal; large?: boolean }) {
 
 function Toast({ message }: { message: string }) {
   return <div className="toast" role="status"><span>✓</span>{message}</div>;
+}
+
+function EncouragementPopup({ message, onClose }: { message: string; onClose: () => void }) {
+  return <div className="encouragement-popup" role="status"><span>✦</span><p>{message}</p><button type="button" onClick={onClose} aria-label="응원 문구 닫기">×</button></div>;
 }
 
 export default function Home() {
@@ -210,6 +237,7 @@ export default function Home() {
   const [allergyDraft, setAllergyDraft] = useState("");
   const [savingAllergies, setSavingAllergies] = useState(false);
   const [toast, setToast] = useState("");
+  const [encouragement, setEncouragement] = useState("");
   const [aiMode, setAiMode] = useState<"live" | "demo" | null>(null);
   const [aiReason, setAiReason] = useState<string | null>(null);
   const [, setAiModel] = useState<string | null>(null);
@@ -322,6 +350,12 @@ export default function Home() {
     const timer = window.setTimeout(() => setToast(""), 2600);
     return () => window.clearTimeout(timer);
   }, [toast]);
+
+  useEffect(() => {
+    if (!encouragement) return;
+    const timer = window.setTimeout(() => setEncouragement(""), 3200);
+    return () => window.clearTimeout(timer);
+  }, [encouragement]);
 
   const saveTarget = async (next: Nutrition) => {
     setTarget(next);
@@ -718,6 +752,13 @@ export default function Home() {
     router.refresh();
   };
 
+  const showEncouragement = () => {
+    setEncouragement((current) => {
+      const candidates = encouragementMessages.filter((message) => message !== current);
+      return candidates[Math.floor(Math.random() * candidates.length)];
+    });
+  };
+
   const openMeal = (meal: Meal) => setSelectedMeal(meal);
   const selectedDateObject = new Date(`${selectedDate}T12:00:00`);
   const dateTabs = [-2, -1, 0, 1, 2].map((offset) => addDays(selectedDateObject, offset));
@@ -730,7 +771,7 @@ export default function Home() {
     const isToday = selectedDate === isoDate(today);
     return (
       <>
-        <Header title="오늘도 잘 챙겨요" eyebrow="나의 음식 기록" />
+        <Header title="오늘도 잘 챙겨요" eyebrow="나의 음식 기록" onEncouragement={showEncouragement} />
         <main className="screen-content home-content">
           <section className="diary-date-section">
             <div className="diary-date-title">
@@ -811,7 +852,7 @@ export default function Home() {
     const showShortcuts = !searchQuery.trim();
     return (
       <>
-        <Header title={`${diaryMealTypeLabel[activeMealType]} 음식 추가`} eyebrow={selectedDate} onBack={() => setScreen(editingEntries.length ? "meal-editor" : "home")} />
+        <Header title={`${diaryMealTypeLabel[activeMealType]} 음식 추가`} eyebrow={selectedDate} onBack={() => setScreen(editingEntries.length ? "meal-editor" : "home")} onEncouragement={showEncouragement} />
         <main className="screen-content food-search-content">
           <section className="food-search-hero">
             <span>FOOD SEARCH</span>
@@ -884,7 +925,7 @@ export default function Home() {
     const nutrition = addNutrition(editingEntries.map((entry) => entry.nutrition));
     return (
       <>
-        <Header title={<span className="header-meal-title"><span className="header-meal-icon"><MealTypeIcon type={activeMealType} size={24} /></span>{diaryMealTypeLabel[activeMealType]}</span>} eyebrow={`${selectedDate} 실제 섭취`} onBack={() => setScreen("home")} />
+        <Header title={<span className="header-meal-title"><span className="header-meal-icon"><MealTypeIcon type={activeMealType} size={24} /></span>{diaryMealTypeLabel[activeMealType]}</span>} eyebrow={`${selectedDate} 실제 섭취`} onBack={() => setScreen("home")} onEncouragement={showEncouragement} />
         <main className="screen-content meal-editor-content">
           <section className="meal-editor-summary"><span>총 섭취량</span><h2>{nutrition.calories} <em>kcal</em></h2><MacroRow nutrition={nutrition} /></section>
           <section className="meal-editor-list">
@@ -900,7 +941,7 @@ export default function Home() {
 
   const renderCreateFood = () => (
     <>
-      <Header title="음식 직접 등록" eyebrow="MY FOOD" onBack={() => setScreen("food-search")} />
+      <Header title="음식 직접 등록" eyebrow="MY FOOD" onBack={() => setScreen("food-search")} onEncouragement={showEncouragement} />
       <main className="screen-content create-food-content">
         <section className="simple-hero"><span>검색에 없는 음식도</span><h2>내 음식으로 저장해요</h2><p>한 번 등록하면 다음부터 검색과 즐겨찾기에서 바로 사용할 수 있어요.</p></section>
         <section className="create-food-card">
@@ -915,7 +956,7 @@ export default function Home() {
 
   const renderAI = () => (
     <>
-      <Header title="AI 3일 식단" eyebrow="MEAL DESIGNER" />
+      <Header title="AI 3일 식단" eyebrow="MEAL DESIGNER" onEncouragement={showEncouragement} />
       <main className="screen-content ai-content">
         {!plan && !generating && (
           <>
@@ -996,7 +1037,7 @@ export default function Home() {
 
   const renderShopping = () => (
     <>
-      <Header title="3일치 장보기" eyebrow="SMART SHOPPING" onBack={() => setScreen("ai")} />
+      <Header title="3일치 장보기" eyebrow="SMART SHOPPING" onBack={() => setScreen("ai")} onEncouragement={showEncouragement} />
       <main className="screen-content shopping-content">
         <section className="shopping-hero"><div><span>아홉 끼를 위한</span><h2>한 번의 장보기</h2><p>겹치는 재료는 합치고, 필요한 양만 정리했어요.</p></div><div className="basket">◒<i>14</i></div></section>
         <div className="shopping-stat"><span>재료 재사용으로</span><strong>약 31% <em>↓</em></strong><p>불필요한 식재료 종류를 줄였어요</p></div>
@@ -1016,7 +1057,7 @@ export default function Home() {
 
   const renderCommunity = () => (
     <>
-      <Header title="함께 먹는 식단" eyebrow="COMMUNITY" />
+      <Header title="함께 먹는 식단" eyebrow="COMMUNITY" onEncouragement={showEncouragement} />
       <main className="screen-content community-content">
         <section className="community-intro"><div><span>오늘의 식단 기록</span><h2>누군가의 한 끼가<br />나의 다음 메뉴가 돼요.</h2></div><span className="people-stack"><i>민</i><i>프</i><i>오</i><b>+82</b></span></section>
         <div className="feed-filter"><button className="active">추천</button><button>최신</button><button>고단백</button><button>간편식</button></div>
@@ -1044,7 +1085,7 @@ export default function Home() {
     const meals = getAllMeals(activePlan).filter((meal) => favorites.includes(meal.id));
     return (
       <>
-        <Header title="즐겨찾기" eyebrow="FOODS & RECIPES" />
+        <Header title="즐겨찾기" eyebrow="FOODS & RECIPES" onEncouragement={showEncouragement} />
         <main className="screen-content favorites-content">
           <section className="simple-hero"><span>자주 먹는 것도, 먹고 싶은 것도</span><h2>두 개의 즐겨찾기</h2><p>실제 기록용 음식과 AI 추천 레시피를 구분해서 보관해요.</p></section>
           <section className="favorite-food-section">
@@ -1062,7 +1103,7 @@ export default function Home() {
 
   const renderMy = () => (
     <>
-      <Header title="나의 목표" eyebrow="MY NUTRITION" />
+      <Header title="나의 목표" eyebrow="MY NUTRITION" onEncouragement={showEncouragement} />
       <main className="screen-content my-content">
         <section className="profile-card"><div className="profile-avatar">{currentUser?.nickname.slice(0, 1) ?? "M"}<span>✦</span></div><div><span>오늘도 꾸준한</span><h2>{currentUser?.nickname ?? "밀핏 챌린저"}</h2><p>{currentUser?.email ?? "내 식단을 안전하게 저장하고 있어요"}</p></div></section>
         <section className="settings-card">
@@ -1192,6 +1233,7 @@ export default function Home() {
           </div>
         )}
 
+        {encouragement && <EncouragementPopup message={encouragement} onClose={() => setEncouragement("")} />}
         {toast && <Toast message={toast} />}
       </div>
     </div>
