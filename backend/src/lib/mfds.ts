@@ -28,7 +28,7 @@ const number = (row: RawFood, ...keys: string[]) => {
   return Number.isFinite(parsed) ? parsed : 0;
 };
 
-function normalize(row: RawFood): NormalizedFood | null {
+export function normalizeMfdsFood(row: RawFood): NormalizedFood | null {
   const id = text(row, "FOOD_CD", "foodCd", "food_code", "NUM");
   const name = text(row, "FOOD_NM_KR", "FOOD_NM", "foodNm", "food_name");
   if (!id || !name) return null;
@@ -41,9 +41,9 @@ function normalize(row: RawFood): NormalizedFood | null {
     unit: amountText.toLowerCase().includes("ml") ? "ml" : "g",
     nutrition: {
       calories: number(row, "AMT_NUM1", "NUTR_CONT1", "energy"),
-      carbs: number(row, "AMT_NUM8", "NUTR_CONT2", "carbohydrate"),
-      protein: number(row, "AMT_NUM6", "NUTR_CONT3", "protein"),
-      fat: number(row, "AMT_NUM7", "NUTR_CONT4", "fat"),
+      carbs: number(row, "AMT_NUM6", "NUTR_CONT2", "carbohydrate"),
+      protein: number(row, "AMT_NUM3", "NUTR_CONT3", "protein"),
+      fat: number(row, "AMT_NUM4", "NUTR_CONT4", "fat"),
     },
     source: "mfds",
   };
@@ -68,5 +68,5 @@ export async function searchMfds(query: string, config: AppConfig) {
       : nested && "item" in nested && Array.isArray(nested.item)
         ? nested.item
         : [];
-  return { foods: rows.map((row) => normalize(row as RawFood)).filter((food): food is NormalizedFood => Boolean(food)) };
+  return { foods: rows.map((row) => normalizeMfdsFood(row as RawFood)).filter((food): food is NormalizedFood => Boolean(food)) };
 }

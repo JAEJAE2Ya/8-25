@@ -16,7 +16,7 @@
 /* Authentication keeps the same compact, mobile-first Mealfit visual language. */
 .auth-page { min-height: 100dvh; display: grid; place-items: center; padding: 24px; background: #edf0e9; color: #173b2b; }
 .auth-card { width: min(100%, 430px); padding: 42px 28px 32px; border-radius: 32px; background: rgba(255,255,255,.94); box-shadow: 0 24px 80px rgba(28,58,41,.13); }
-.auth-logo { display: grid; place-items: center; width: 48px; height: 48px; margin-bottom: 26px; border-radius: 15px; background: #174f38; color: #dfff75; font: 800 28px/1 Georgia, serif; }
+.auth-logo { display: block; width: 48px; height: 48px; margin-bottom: 26px; border-radius: 15px; object-fit: cover; box-shadow: 0 5px 14px rgba(43,72,52,.14); }
 .auth-card h1 { margin: 7px 0 8px; font-size: 29px; letter-spacing: -.05em; }
 .auth-card > p { margin: 0 0 28px; color: #738077; font-size: 14px; }
 .auth-card form { display: grid; gap: 16px; }
@@ -63,21 +63,18 @@ a { color: inherit; text-decoration: none; }
   backdrop-filter: blur(16px);
 }
 .brand-mark {
-  display: grid;
+  display: block;
   width: 36px;
   height: 36px;
-  place-items: center;
-  border-radius: 12px 12px 12px 4px;
-  background: var(--green);
-  color: var(--lime);
-  font-family: Georgia, serif;
-  font-size: 22px;
-  font-style: italic;
-  font-weight: 700;
+  border-radius: 11px;
+  object-fit: cover;
+  box-shadow: 0 4px 11px rgba(43,72,52,.13);
 }
 .header-copy { min-width: 0; }
 .header-copy > span { display: block; color: #889088; font-size: 10px; font-weight: 800; letter-spacing: .14em; }
 .header-copy h1 { margin: 2px 0 0; font-size: 19px; line-height: 1.2; letter-spacing: -.04em; }
+.header-meal-title { display: inline-flex; align-items: center; gap: 7px; }
+.header-meal-icon { display: inline-flex; width: 24px; height: 24px; flex: 0 0 24px; overflow: hidden; border-radius: 8px; }
 .header-action { display: flex; justify-content: flex-end; }
 .icon-button {
   position: relative;
@@ -324,7 +321,8 @@ a { color: inherit; text-decoration: none; }
 .diary-meal-card.has-food { cursor: pointer; }
 .diary-meal-heading { display: flex; align-items: center; justify-content: space-between; }
 .diary-meal-heading > div { display: flex; align-items: center; gap: 9px; }
-.diary-meal-heading > div:first-child > span { display: grid; width: 34px; height: 34px; place-items: center; border-radius: 12px; background: #f0f3e9; color: var(--green); font-size: 18px; }
+.diary-meal-heading > div:first-child > span { display: grid; width: 34px; height: 34px; overflow: hidden; place-items: center; border-radius: 12px; background: #f0f3e9; color: var(--green); font-size: 18px; }
+.meal-type-icon-image { display: block; width: 100%; height: 100%; object-fit: cover; }
 .diary-meal-heading h3 { margin: 0; font-size: 17px; letter-spacing: -.04em; }
 .diary-meal-heading strong { font-size: 11px; }
 .diary-meal-heading button { display: grid; width: 40px; height: 40px; place-items: center; border: 0; border-radius: 14px; background: var(--lime); color: var(--green); font-size: 24px; font-weight: 600; cursor: pointer; }
@@ -669,7 +667,7 @@ a { color: inherit; text-decoration: none; }
 .schedule-options button.active { border-color: var(--green); background: var(--green); color: white; }
 .meal-options { grid-template-columns: repeat(3, 1fr); }
 .meal-options button { display: flex; height: 45px; align-items: center; justify-content: center; gap: 5px; font-size: 10px; }
-.meal-options button span { font-size: 15px; }
+.meal-options button .meal-option-icon { display: block; width: 24px; height: 24px; flex: 0 0 24px; overflow: hidden; border-radius: 8px; }
 .review-field { display: flex; flex-direction: column; margin-top: 18px; }
 .review-field > span { margin-bottom: 8px; font-size: 10px; font-weight: 900; }
 .review-field textarea { min-height: 126px; resize: vertical; padding: 13px 14px; border: 1px solid #dfe4df; border-radius: 15px; outline: none; background: #fafbf9; color: var(--ink); font: inherit; line-height: 1.65; }

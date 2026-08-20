@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { BackendError, backendFetch } from "@/lib/backend-api";
@@ -36,7 +37,7 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
   return (
     <main className="auth-page">
       <section className="auth-card">
-        <span className="auth-logo">m</span>
+        <Image className="auth-logo" src="/mealfit-logo.png" alt="Mealfit" width={48} height={48} />
         <span className="section-kicker">MEALFIT</span>
         <h1>{signup ? "내 식단 시작하기" : "다시 만나서 반가워요"}</h1>
         <p>먹은 것과 먹을 예정인 식단을 안전하게 저장해요.</p>

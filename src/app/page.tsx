@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import {
   addNutrition,
@@ -30,7 +31,12 @@ type TargetDraft = Record<TargetKey, string>;
 type RecentFood = { food: FoodSearchResult; count: number; lastUsedAt: string };
 
 const diaryMealTypes: DiaryMealType[] = ["breakfast", "lunch", "dinner", "snack"];
-const mealIcons: Record<DiaryMealType, string> = { breakfast: "☀", lunch: "◐", dinner: "☾", snack: "◇" };
+const mealIconSrc: Record<DiaryMealType, string> = {
+  breakfast: "/meal-breakfast.png",
+  lunch: "/meal-lunch.png",
+  dinner: "/meal-dinner.png",
+  snack: "/meal-snack.png",
+};
 
 const macroRatios: Record<MacroRatio, { carbs: number; protein: number; fat: number; description: string }> = {
   "5:3:2": { carbs: 5, protein: 3, fat: 2, description: "균형 잡힌 일반 식단" },
@@ -127,11 +133,15 @@ function MacroRow({ nutrition, compact = false }: { nutrition: Nutrition; compac
   );
 }
 
-function Header({ title, eyebrow, onBack, action }: { title: string; eyebrow?: string; onBack?: () => void; action?: React.ReactNode }) {
+function MealTypeIcon({ type, size }: { type: DiaryMealType; size: number }) {
+  return <Image className="meal-type-icon-image" src={mealIconSrc[type]} alt="" width={size} height={size} />;
+}
+
+function Header({ title, eyebrow, onBack, action }: { title: React.ReactNode; eyebrow?: string; onBack?: () => void; action?: React.ReactNode }) {
   return (
     <header className="top-header">
       <div>
-        {onBack ? <button className="icon-button back-button" onClick={onBack} aria-label="뒤로 가기">←</button> : <span className="brand-mark">m</span>}
+        {onBack ? <button className="icon-button back-button" onClick={onBack} aria-label="뒤로 가기">←</button> : <Image className="brand-mark" src="/mealfit-logo.png" alt="Mealfit" width={36} height={36} />}
       </div>
       <div className="header-copy">
         {eyebrow && <span>{eyebrow}</span>}
@@ -737,7 +747,7 @@ export default function Home() {
                 return (
                   <article className={`diary-meal-card ${mealEntries.length ? "has-food" : ""}`} key={mealType} onClick={() => mealEntries.length && openMealEditor(mealType)}>
                     <div className="diary-meal-heading">
-                      <div><span>{mealIcons[mealType]}</span><h3>{diaryMealTypeLabel[mealType]}</h3></div>
+                      <div><span className="diary-meal-icon"><MealTypeIcon type={mealType} size={34} /></span><h3>{diaryMealTypeLabel[mealType]}</h3></div>
                       <div>{mealEntries.length > 0 && <strong>{mealNutrition.calories} kcal</strong>}<button onClick={(event) => { event.stopPropagation(); startFoodSearch(mealType); }} aria-label={`${diaryMealTypeLabel[mealType]} 음식 추가`}>＋</button></div>
                     </div>
                     {mealEntries.length ? (
@@ -845,7 +855,7 @@ export default function Home() {
     const nutrition = addNutrition(editingEntries.map((entry) => entry.nutrition));
     return (
       <>
-        <Header title={`${mealIcons[activeMealType]} ${diaryMealTypeLabel[activeMealType]}`} eyebrow={`${selectedDate} 실제 섭취`} onBack={() => setScreen("home")} />
+        <Header title={<span className="header-meal-title"><span className="header-meal-icon"><MealTypeIcon type={activeMealType} size={24} /></span>{diaryMealTypeLabel[activeMealType]}</span>} eyebrow={`${selectedDate} 실제 섭취`} onBack={() => setScreen("home")} />
         <main className="screen-content meal-editor-content">
           <section className="meal-editor-summary"><span>총 섭취량</span><h2>{nutrition.calories} <em>kcal</em></h2><MacroRow nutrition={nutrition} /></section>
           <section className="meal-editor-list">
@@ -1134,7 +1144,7 @@ export default function Home() {
               <div className="schedule-options date-options">{[0, 1, 2, 3].map((offset) => <button key={offset} onClick={() => setScheduleOffset(offset)} className={scheduleOffset === offset ? "active" : ""}><span>{dateChoiceLabel(offset)}</span><b>{offset === 3 ? "날짜" : shortDate(addDays(today, offset))}</b></button>)}</div>
               {scheduleOffset === 3 && <label className="custom-date-input"><span>날짜</span><input type="date" value={customScheduleDate} min={isoDate(today)} onChange={(event) => setCustomScheduleDate(event.target.value)} /></label>}
               <label className="sheet-label">끼니 선택</label>
-              <div className="schedule-options meal-options">{(["breakfast", "lunch", "dinner"] as MealType[]).map((type) => <button key={type} onClick={() => setScheduleType(type)} className={scheduleType === type ? "active" : ""}><span>{type === "breakfast" ? "☀" : type === "lunch" ? "◐" : "☾"}</span>{mealTypeLabel[type]}</button>)}</div>
+              <div className="schedule-options meal-options">{(["breakfast", "lunch", "dinner"] as MealType[]).map((type) => <button key={type} onClick={() => setScheduleType(type)} className={scheduleType === type ? "active" : ""}><span className="meal-option-icon"><MealTypeIcon type={type} size={24} /></span>{mealTypeLabel[type]}</button>)}</div>
               <button className="primary-cta" onClick={saveSchedule}>{scheduleOffset === 3 ? customScheduleDate : dateChoiceLabel(scheduleOffset)} {mealTypeLabel[scheduleType]}에 등록하기</button>
             </div>
           </div>

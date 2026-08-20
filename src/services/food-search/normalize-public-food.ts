@@ -37,9 +37,9 @@ export function normalizePublicFood(row: PublicFoodRow): FoodSearchResult | null
     servingUnit,
     nutrition: {
       calories: number(row, "AMT_NUM1", "NUTR_CONT1", "energy"),
-      carbs: number(row, "AMT_NUM8", "NUTR_CONT2", "carbohydrate"),
-      protein: number(row, "AMT_NUM6", "NUTR_CONT3", "protein"),
-      fat: number(row, "AMT_NUM7", "NUTR_CONT4", "fat"),
+      carbs: number(row, "AMT_NUM6", "NUTR_CONT2", "carbohydrate"),
+      protein: number(row, "AMT_NUM3", "NUTR_CONT3", "protein"),
+      fat: number(row, "AMT_NUM4", "NUTR_CONT4", "fat"),
     },
     source: "public-api",
   };

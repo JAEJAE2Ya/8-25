@@ -15,7 +15,7 @@ const number = (row, ...keys) => {
     const parsed = Number.parseFloat(value.replace(/[^0-9.-]/g, ""));
     return Number.isFinite(parsed) ? parsed : 0;
 };
-function normalize(row) {
+export function normalizeMfdsFood(row) {
     const id = text(row, "FOOD_CD", "foodCd", "food_code", "NUM");
     const name = text(row, "FOOD_NM_KR", "FOOD_NM", "foodNm", "food_name");
     if (!id || !name)
@@ -29,9 +29,9 @@ function normalize(row) {
         unit: amountText.toLowerCase().includes("ml") ? "ml" : "g",
         nutrition: {
             calories: number(row, "AMT_NUM1", "NUTR_CONT1", "energy"),
-            carbs: number(row, "AMT_NUM8", "NUTR_CONT2", "carbohydrate"),
-            protein: number(row, "AMT_NUM6", "NUTR_CONT3", "protein"),
-            fat: number(row, "AMT_NUM7", "NUTR_CONT4", "fat"),
+            carbs: number(row, "AMT_NUM6", "NUTR_CONT2", "carbohydrate"),
+            protein: number(row, "AMT_NUM3", "NUTR_CONT3", "protein"),
+            fat: number(row, "AMT_NUM4", "NUTR_CONT4", "fat"),
         },
         source: "mfds",
     };
@@ -57,6 +57,6 @@ export async function searchMfds(query, config) {
             : nested && "item" in nested && Array.isArray(nested.item)
                 ? nested.item
                 : [];
-    return { foods: rows.map((row) => normalize(row)).filter((food) => Boolean(food)) };
+    return { foods: rows.map((row) => normalizeMfdsFood(row)).filter((food) => Boolean(food)) };
 }
 //# sourceMappingURL=mfds.js.map

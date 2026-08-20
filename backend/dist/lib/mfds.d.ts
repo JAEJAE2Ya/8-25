@@ -1,4 +1,5 @@
 import type { AppConfig } from "../config.js";
+type RawFood = Record<string, unknown>;
 export type NormalizedFood = {
     id: string;
     name: string;
@@ -13,6 +14,7 @@ export type NormalizedFood = {
     };
     source: "mfds" | "user";
 };
+export declare function normalizeMfdsFood(row: RawFood): NormalizedFood | null;
 export declare function searchMfds(query: string, config: AppConfig): Promise<{
     foods: NormalizedFood[];
     warning: string;
@@ -20,3 +22,4 @@ export declare function searchMfds(query: string, config: AppConfig): Promise<{
     foods: NormalizedFood[];
     warning?: undefined;
 }>;
+export {};
