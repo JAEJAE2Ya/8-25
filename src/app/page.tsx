@@ -874,7 +874,7 @@ export default function Home() {
             <div className="portion-control"><button onClick={() => setSelectedAmountText(String(Math.max(1, amount - step)))} aria-label="섭취량 줄이기">−</button><label><input type="text" inputMode="decimal" value={selectedAmountText} onChange={(event) => /^\d*\.?\d*$/.test(event.target.value) && setSelectedAmountText(event.target.value)} /><em>{selectedFood.servingUnit ?? "g"}</em></label><button onClick={() => setSelectedAmountText(String(amount + step))} aria-label="섭취량 늘리기">＋</button></div>
             <div className="portion-presets">{[0.5, 1, 1.5, 2].map((ratio) => <button key={ratio} onClick={() => setSelectedAmountText(String(Math.round(baseAmount * ratio * 10) / 10))}>{ratio}배</button>)}</div>
           </section>
-          <button className="primary-cta food-add-cta" onClick={addSelectedFood}>목록에 담기 <b>→</b></button>
+          <button className="primary-cta food-add-cta" onClick={addSelectedFood}><span>목록에 담기</span><b>→</b></button>
         </main>
       </>
     );
