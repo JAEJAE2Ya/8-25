@@ -148,7 +148,8 @@ export function registerAiRoutes(app: FastifyInstance, db: PrismaClient, config:
     };
     const cuisine = String(preferences.cuisine || "한식").slice(0, 20);
     const goal = String(preferences.goal || "균형식").slice(0, 20);
-    const avoidFoods = parsePreferenceList(preferences.avoidFoods, 12);
+    const profile = await db.userNutritionProfile.findUnique({ where: { userId: user.id }, select: { allergies: true } });
+    const avoidFoods = parsePreferenceList(`${String(preferences.avoidFoods || "")}\n${profile?.allergies ?? ""}`, 20);
     const availableIngredients = parsePreferenceList(preferences.availableIngredients, 20);
     const excluded = parsePreferenceList(body.excludeMealNames, 12);
     const prompt = `한국 사용자를 위한 실용적인 3일 식단을 설계하세요.
@@ -192,8 +193,17 @@ export function registerAiRoutes(app: FastifyInstance, db: PrismaClient, config:
       const data = await response.json() as Record<string, unknown>;
       const text = outputText(data);
       if (!text) return reply.code(502).send({ error: "ai_invalid_output" });
-      const plan = JSON.parse(text) as { days?: unknown[] };
+      const plan = JSON.parse(text) as { days?: Array<{ meals?: Array<{ name?: unknown; ingredients?: Array<{ name?: unknown }> }> }> };
       if (!Array.isArray(plan.days) || plan.days.length !== 3) return reply.code(502).send({ error: "ai_invalid_output" });
+      const recipeFoodNames = plan.days.flatMap((day) => (day.meals ?? []).flatMap((meal) => [
+        String(meal.name ?? ""),
+        ...(meal.ingredients ?? []).map((ingredient) => String(ingredient.name ?? "")),
+      ])).map((name) => name.toLocaleLowerCase("ko-KR").replace(/\s+/g, ""));
+      const containsExcludedFood = avoidFoods.some((food) => {
+        const normalizedFood = food.toLocaleLowerCase("ko-KR").replace(/\s+/g, "");
+        return normalizedFood.length > 0 && recipeFoodNames.some((name) => name.includes(normalizedFood));
+      });
+      if (containsExcludedFood) return reply.code(502).send({ error: "ai_exclusion_violation" });
       return { mode: "live", model: config.aiModel, plan };
     } catch (error) {
       request.log.error({ error, model: config.aiModel }, "OpenAI request failed");

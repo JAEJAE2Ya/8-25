@@ -206,6 +206,9 @@ export default function Home() {
   const [sharingMeal, setSharingMeal] = useState(false);
   const [userFoodDraft, setUserFoodDraft] = useState({ name: "", amount: "100", unit: "g", calories: "", carbs: "", protein: "", fat: "" });
   const [avoidFoods, setAvoidFoods] = useState("");
+  const [allergyEditorOpen, setAllergyEditorOpen] = useState(false);
+  const [allergyDraft, setAllergyDraft] = useState("");
+  const [savingAllergies, setSavingAllergies] = useState(false);
   const [toast, setToast] = useState("");
   const [aiMode, setAiMode] = useState<"live" | "demo" | null>(null);
   const [aiReason, setAiReason] = useState<string | null>(null);
@@ -231,7 +234,7 @@ export default function Home() {
         if (savedMacroRatio === "5:3:2" || savedMacroRatio === "4:4:2") setMacroRatio(savedMacroRatio);
         const [{ user }, { profile }, favoriteFoodData, favoriteRecipeData, userFoodData, recentFoodData, communityData] = await Promise.all([
           backendFetch<{ user: AuthUser }>("/api/auth/me"),
-          backendFetch<{ profile: { dailyCalories: number; carbsTarget: number; proteinTarget: number; fatTarget: number } }>("/api/profile/nutrition"),
+          backendFetch<{ profile: { dailyCalories: number; carbsTarget: number; proteinTarget: number; fatTarget: number; allergies: string | null } }>("/api/profile/nutrition"),
           backendFetch<{ foods: BackendFood[] }>("/api/favorites/foods"),
           backendFetch<{ recipes: Array<Meal & { favoriteId: string; externalId?: string }> }>("/api/favorites/recipes"),
           backendFetch<{ foods: BackendFood[] }>("/api/foods/user"),
@@ -242,6 +245,7 @@ export default function Home() {
         const profileTarget = { calories: profile.dailyCalories, carbs: profile.carbsTarget, protein: profile.proteinTarget, fat: profile.fatTarget };
         setTarget(profileTarget);
         setTargetDraft(toTargetDraft(profileTarget));
+        setAvoidFoods(profile.allergies ?? "");
         setFavoriteFoods(favoriteFoodData.foods.map(toFood));
         setFavorites(favoriteRecipeData.recipes.map((recipe) => recipe.externalId ?? recipe.id));
         setFavoriteRecipeIds(Object.fromEntries(favoriteRecipeData.recipes.map((recipe) => [recipe.externalId ?? recipe.id, recipe.favoriteId])));
@@ -357,6 +361,29 @@ export default function Home() {
     localStorage.setItem("mealfit-macro-ratio", macroRatio);
     setToast("영양 목표를 저장했어요");
     setScreen("home");
+  };
+
+  const openAllergyEditor = () => {
+    setAllergyDraft(avoidFoods);
+    setAllergyEditorOpen(true);
+  };
+
+  const saveAllergies = async () => {
+    if (savingAllergies) return;
+    setSavingAllergies(true);
+    try {
+      const data = await backendFetch<{ profile: { allergies: string | null } }>("/api/profile/nutrition", {
+        method: "PATCH",
+        body: JSON.stringify({ allergies: allergyDraft.trim() }),
+      });
+      setAvoidFoods(data.profile.allergies ?? "");
+      setAllergyEditorOpen(false);
+      setToast("알레르기 및 제외 식품을 저장했어요");
+    } catch {
+      setToast("알레르기 및 제외 식품을 저장하지 못했어요");
+    } finally {
+      setSavingAllergies(false);
+    }
   };
 
   const toggleFavorite = async (mealId: string) => {
@@ -508,14 +535,16 @@ export default function Home() {
       if (nextMode === "demo") setToast(aiReasonMessage(nextReason));
     } catch (error) {
       const reason = error instanceof Error ? error.message : "client_request_failed";
-      setPlan(mockMealPlan);
-      setAiMode("demo");
+      const hasExclusions = avoidFoods.trim().length > 0;
+      setPlan(hasExclusions ? null : mockMealPlan);
+      setAiMode(hasExclusions ? null : "demo");
       setAiReason(reason);
       setAiModel(null);
-      localStorage.setItem("mealfit-ai-mode", "demo");
+      if (hasExclusions) localStorage.removeItem("mealfit-ai-mode");
+      else localStorage.setItem("mealfit-ai-mode", "demo");
       localStorage.setItem("mealfit-ai-reason", reason);
       localStorage.removeItem("mealfit-ai-model");
-      setToast(aiReasonMessage(reason));
+      setToast(hasExclusions ? "제외 식품을 확인할 수 없어 추천을 만들지 않았어요. 다시 시도해 주세요." : aiReasonMessage(reason));
     } finally {
       setGenerating(false);
     }
@@ -905,7 +934,7 @@ export default function Home() {
               <div className="chip-group">{["한식", "간단한 요리", "저렴하게", "아무거나"].map((item) => <button key={item} onClick={() => setPreference(item)} className={preference === item ? "active" : ""}>{item}</button>)}</div>
               <div className="chip-group secondary">{["고단백", "균형식", "저탄수", "다이어트", "재료 최소화"].map((item) => <button key={item} onClick={() => setGoal(item)} className={goal === item ? "active" : ""}>{item}</button>)}</div>
               <label className="pantry-input"><span><b>집에 있는 식재료</b><em>AI가 먼저 활용해요</em></span><textarea value={availableIngredients} maxLength={300} onChange={(event) => setAvailableIngredients(event.target.value)} placeholder="예: 달걀 4개, 바나나 2개, 오트밀, 김치" /><small>쉼표나 줄바꿈으로 구분해 주세요. 비워두어도 괜찮아요.</small></label>
-              <label className="avoid-food-input"><span>피하고 싶은 음식이 있나요?</span><input value={avoidFoods} onChange={(event) => setAvoidFoods(event.target.value)} placeholder="예: 버섯, 가지 (선택)" /></label>
+              <label className="avoid-food-input"><span><b>알레르기·제외 식품</b><em>MY에 저장된 내용을 자동 적용해요</em></span><input maxLength={1000} value={avoidFoods} onChange={(event) => setAvoidFoods(event.target.value)} placeholder="예: 땅콩, 우유, 새우, 버섯" /></label>
             </section>
             <button className="primary-cta" onClick={generatePlan}><span>✦</span> 3일 메뉴 추천받기 <b>→</b></button>
             <p className="cta-helper">3일 × 3끼 · 겹치는 재료를 찾아 장보기를 줄여요</p>
@@ -1073,7 +1102,7 @@ export default function Home() {
           )}
           <button className="primary-cta compact" onClick={commitTarget}>목표 저장하기</button>
         </section>
-        <section className="settings-list"><button><span>🥬</span><div><b>선호 식단</b><em>한식 · 고단백</em></div><i>›</i></button><button><span>⚑</span><div><b>알레르기 및 제외 식품</b><em>비공개 프로필에 저장</em></div><i>›</i></button><button onClick={logout}><span>↪</span><div><b>로그아웃</b><em>다른 계정으로 전환하기</em></div><i>›</i></button></section>
+        <section className="settings-list"><button onClick={openAllergyEditor}><span>⚑</span><div><b>알레르기 및 제외 식품</b><em>{avoidFoods.trim() || "등록된 식품 없음 · 비공개 프로필에 저장"}</em></div><i>›</i></button><button onClick={logout}><span>↪</span><div><b>로그아웃</b><em>다른 계정으로 전환하기</em></div><i>›</i></button></section>
       </main>
     </>
   );
@@ -1129,6 +1158,19 @@ export default function Home() {
               <div className="selected-meal-chip"><span>{shareReviewMeal.emoji}</span><div><b>{shareReviewMeal.name}</b><em>{shareReviewMeal.nutrition.calories} kcal</em></div></div>
               <label className="review-field"><span>나의 후기</span><textarea autoFocus required maxLength={500} value={shareReviewDraft} onChange={(event) => setShareReviewDraft(event.target.value)} placeholder="맛, 조리 난이도, 다음에 바꾸고 싶은 점을 자유롭게 적어보세요." /><small>{shareReviewDraft.length} / 500</small></label>
               <div className="share-review-actions"><button type="button" onClick={closeShareReview} disabled={sharingMeal}>취소</button><button type="submit" disabled={sharingMeal || !shareReviewDraft.trim()}>{sharingMeal ? "공유 중…" : "후기와 함께 공유"}</button></div>
+            </form>
+          </div>
+        )}
+
+        {allergyEditorOpen && (
+          <div className="modal-layer allergy-layer" role="dialog" aria-modal="true" aria-label="알레르기 및 제외 식품 설정">
+            <button className="modal-scrim" onClick={() => setAllergyEditorOpen(false)} aria-label="알레르기 설정 창 닫기" />
+            <form className="allergy-sheet" onSubmit={(event) => { event.preventDefault(); void saveAllergies(); }}>
+              <div className="sheet-handle" />
+              <div className="sheet-heading"><div><span>PRIVATE PROFILE</span><h2>알레르기 및 제외 식품</h2></div><button type="button" onClick={() => setAllergyEditorOpen(false)}>×</button></div>
+              <label className="allergy-field"><span>먹지 못하거나 피하고 싶은 식품</span><textarea autoFocus maxLength={1000} value={allergyDraft} onChange={(event) => setAllergyDraft(event.target.value)} placeholder="예: 땅콩, 우유, 새우, 복숭아, 버섯" /><small>쉼표나 줄바꿈으로 구분해 주세요. AI 추천 때 자동으로 제외합니다.</small></label>
+              <p className="allergy-safety-note">AI가 생성한 레시피도 실제 섭취 전 원재료와 알레르기 표시를 다시 확인해 주세요.</p>
+              <div className="share-review-actions"><button type="button" onClick={() => setAllergyEditorOpen(false)} disabled={savingAllergies}>취소</button><button type="submit" disabled={savingAllergies}>{savingAllergies ? "저장 중…" : "저장하기"}</button></div>
             </form>
           </div>
         )}

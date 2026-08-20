@@ -31,6 +31,9 @@ function fakeDatabase() {
         : null,
       delete: async () => undefined,
     },
+    userNutritionProfile: {
+      findUnique: async () => ({ allergies: "우유, 새우" }),
+    },
   } as unknown as PrismaClient;
 }
 
@@ -70,9 +73,40 @@ test("meal-plan prompt prioritizes the user's available ingredients", async () =
     assert.ok(requestBody);
     const input = String(requestBody.input);
     assert.match(input, /\["달걀 4개","바나나 2개","오트밀"\]/);
+    assert.match(input, /\["버섯","우유","새우"\]/);
     assert.match(input, /보유 식재료가 있으면 9끼 전반에서 가능한 한 많이 활용/);
     assert.match(input, /보유 재료 활용/);
     assert.equal((input.match(/달걀 4개/g) ?? []).length, 1);
+  } finally {
+    globalThis.fetch = originalFetch;
+    await app.close();
+  }
+});
+
+test("meal-plan rejects recipes that contain a saved excluded food", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => new Response(JSON.stringify({
+    output_text: JSON.stringify({
+      days: [
+        { day: 1, meals: [{ name: "우유 오트밀", ingredients: [{ name: "우유" }] }] },
+        { day: 2, meals: [] },
+        { day: 3, meals: [] },
+      ],
+      shoppingSummary: {},
+    }),
+  }), { status: 200, headers: { "Content-Type": "application/json" } });
+
+  const app = await buildApp({ db: fakeDatabase(), config, logger: false });
+  try {
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/ai/meal-plan",
+      headers: { cookie: `${SESSION_COOKIE}=${token}` },
+      payload: { target: { calories: 2000, carbs: 250, protein: 150, fat: 44 }, preferences: {} },
+    });
+
+    assert.equal(response.statusCode, 502);
+    assert.equal(response.json().error, "ai_exclusion_violation");
   } finally {
     globalThis.fetch = originalFetch;
     await app.close();

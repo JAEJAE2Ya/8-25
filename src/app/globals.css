@@ -276,6 +276,9 @@ a { color: inherit; text-decoration: none; }
 .plan-actions .primary-cta { margin-top: 0; }
 .plan-actions .outline-cta { margin-top: 9px; }
 .avoid-food-input { display: flex; flex-direction: column; gap: 7px; margin-top: 16px; color: #59665d; font-size: 10px; font-weight: 800; }
+.avoid-food-input > span { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.avoid-food-input b { font-size: 10px; }
+.avoid-food-input em { color: var(--green-2); font-size: 8px; font-style: normal; }
 .avoid-food-input input { height: 47px; padding: 0 14px; border: 1px solid #e0e5df; border-radius: 14px; outline: none; background: white; color: var(--ink); font: inherit; }
 .avoid-food-input input:focus { border-color: var(--green-2); box-shadow: 0 0 0 3px rgba(89,145,105,.12); }
 .pantry-input { display: flex; flex-direction: column; gap: 7px; margin-top: 19px; }
@@ -591,9 +594,9 @@ a { color: inherit; text-decoration: none; }
 .settings-list button { display: grid; grid-template-columns: 39px 1fr 20px; width: 100%; min-height: 66px; align-items: center; border: 0; border-bottom: 1px solid #edf0ec; background: white; text-align: left; cursor: pointer; }
 .settings-list button:last-child { border: 0; }
 .settings-list button > span { display: grid; width: 30px; height: 30px; margin-left: 9px; place-items: center; border-radius: 10px; background: #f0f3ed; font-size: 14px; }
-.settings-list button > div { display: flex; flex-direction: column; }
+.settings-list button > div { display: flex; min-width: 0; flex-direction: column; }
 .settings-list b { font-size: 11px; }
-.settings-list em { margin-top: 3px; color: #949b95; font-size: 8px; font-style: normal; }
+.settings-list em { overflow: hidden; margin-top: 3px; color: #949b95; font-size: 8px; font-style: normal; text-overflow: ellipsis; white-space: nowrap; }
 .settings-list button > i { color: #a8aea9; font-size: 20px; font-style: normal; }
 
 /* Recipe and schedule */
@@ -641,8 +644,9 @@ a { color: inherit; text-decoration: none; }
 .schedule-cta { position: sticky; bottom: 0; z-index: 3; }
 .schedule-layer { z-index: 60; }
 .share-review-layer { z-index: 65; }
+.allergy-layer { z-index: 70; }
 .modal-scrim { position: absolute; inset: 0; border: 0; background: transparent; }
-.schedule-sheet, .share-review-sheet { position: relative; width: 100%; max-width: 480px; padding: 9px 20px 28px; border-radius: 26px 26px 0 0; background: white; animation: sheetUp .25s ease-out; }
+.schedule-sheet, .share-review-sheet, .allergy-sheet { position: relative; width: 100%; max-width: 480px; padding: 9px 20px 28px; border-radius: 26px 26px 0 0; background: white; animation: sheetUp .25s ease-out; }
 .sheet-handle { width: 40px; height: 4px; margin: 0 auto 18px; border-radius: 10px; background: #d8ddd8; }
 .sheet-heading { display: flex; align-items: flex-start; justify-content: space-between; }
 .sheet-heading span { color: var(--green-2); font-size: 9px; font-weight: 900; }
@@ -673,6 +677,12 @@ a { color: inherit; text-decoration: none; }
 .review-field textarea { min-height: 126px; resize: vertical; padding: 13px 14px; border: 1px solid #dfe4df; border-radius: 15px; outline: none; background: #fafbf9; color: var(--ink); font: inherit; line-height: 1.65; }
 .review-field textarea:focus { border-color: var(--green-2); box-shadow: 0 0 0 3px rgba(89,145,105,.12); }
 .review-field small { align-self: flex-end; margin-top: 5px; color: #929a94; font-size: 8px; }
+.allergy-field { display: flex; flex-direction: column; margin-top: 20px; }
+.allergy-field > span { margin-bottom: 8px; color: #536159; font-size: 10px; font-weight: 900; }
+.allergy-field textarea { min-height: 118px; resize: vertical; padding: 13px 14px; border: 1px solid #dfe4df; border-radius: 15px; outline: none; background: #fafbf9; color: var(--ink); font: inherit; line-height: 1.65; }
+.allergy-field textarea:focus { border-color: var(--green-2); box-shadow: 0 0 0 3px rgba(89,145,105,.12); }
+.allergy-field small { margin-top: 6px; color: #89948c; font-size: 8px; line-height: 1.5; }
+.allergy-safety-note { margin: 13px 0 0; padding: 10px 12px; border-radius: 12px; background: #fff6e9; color: #806842; font-size: 8px; line-height: 1.55; }
 .share-review-actions { display: grid; grid-template-columns: .8fr 1.2fr; gap: 9px; margin-top: 15px; }
 .share-review-actions button { height: 48px; border: 1px solid #dfe4df; border-radius: 14px; background: white; color: #657168; font-size: 10px; font-weight: 900; cursor: pointer; }
 .share-review-actions button:last-child { border-color: var(--green); background: var(--green); color: white; }
