@@ -83,3 +83,21 @@ ALTER TABLE "UserFood" ALTER COLUMN "normalizedName" SET NOT NULL;
 
 CREATE UNIQUE INDEX "UserFood_userId_normalizedName_key"
 ON "UserFood"("userId", "normalizedName");
+
+-- Keep the database compatible with the previous backend during a rollback.
+-- The old code does not send normalizedName, so PostgreSQL derives it from
+-- name for both old and new application versions.
+CREATE FUNCTION "setUserFoodNormalizedName"()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  NEW."normalizedName" := LOWER(BTRIM(NEW."name"));
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER "UserFood_set_normalized_name"
+BEFORE INSERT OR UPDATE OF "name" ON "UserFood"
+FOR EACH ROW
+EXECUTE FUNCTION "setUserFoodNormalizedName"();
