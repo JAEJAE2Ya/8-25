@@ -281,6 +281,13 @@ a { color: inherit; text-decoration: none; }
 .avoid-food-input { display: flex; flex-direction: column; gap: 7px; margin-top: 16px; color: #59665d; font-size: 10px; font-weight: 800; }
 .avoid-food-input input { height: 47px; padding: 0 14px; border: 1px solid #e0e5df; border-radius: 14px; outline: none; background: white; color: var(--ink); font: inherit; }
 .avoid-food-input input:focus { border-color: var(--green-2); box-shadow: 0 0 0 3px rgba(89,145,105,.12); }
+.pantry-input { display: flex; flex-direction: column; gap: 7px; margin-top: 19px; }
+.pantry-input > span { display: flex; align-items: center; justify-content: space-between; }
+.pantry-input b { color: #46544a; font-size: 10px; }
+.pantry-input em { color: var(--green-2); font-size: 9px; font-style: normal; font-weight: 800; }
+.pantry-input textarea { min-height: 82px; resize: vertical; padding: 12px 14px; border: 1px solid #dce5da; border-radius: 14px; outline: none; background: #fbfdf9; color: var(--ink); font: inherit; line-height: 1.55; }
+.pantry-input textarea:focus { border-color: var(--green-2); box-shadow: 0 0 0 3px rgba(89,145,105,.12); }
+.pantry-input small { color: #8a958d; font-size: 8px; line-height: 1.5; }
 .ai-summary-meals { display: flex; flex-direction: column; gap: 7px; margin-top: 13px; }
 .ai-summary-meals button { display: grid; grid-template-columns: 48px 1fr 18px; min-height: 62px; align-items: center; padding: 0 13px; border: 1px solid #e6eae4; border-radius: 16px; background: #fafbf8; text-align: left; cursor: pointer; }
 .ai-summary-meals button > span { color: var(--green-2); font-size: 9px; font-weight: 900; }
@@ -635,8 +642,9 @@ a { color: inherit; text-decoration: none; }
 .recipe-secondary-actions button { height: 45px; border: 1px solid #dce1dc; border-radius: 13px; background: white; color: #657168; font-size: 10px; font-weight: 800; cursor: pointer; }
 .schedule-cta { position: sticky; bottom: 0; z-index: 3; }
 .schedule-layer { z-index: 60; }
+.share-review-layer { z-index: 65; }
 .modal-scrim { position: absolute; inset: 0; border: 0; background: transparent; }
-.schedule-sheet { position: relative; width: 100%; max-width: 480px; padding: 9px 20px 28px; border-radius: 26px 26px 0 0; background: white; animation: sheetUp .25s ease-out; }
+.schedule-sheet, .share-review-sheet { position: relative; width: 100%; max-width: 480px; padding: 9px 20px 28px; border-radius: 26px 26px 0 0; background: white; animation: sheetUp .25s ease-out; }
 .sheet-handle { width: 40px; height: 4px; margin: 0 auto 18px; border-radius: 10px; background: #d8ddd8; }
 .sheet-heading { display: flex; align-items: flex-start; justify-content: space-between; }
 .sheet-heading span { color: var(--green-2); font-size: 9px; font-weight: 900; }
@@ -662,6 +670,15 @@ a { color: inherit; text-decoration: none; }
 .meal-options { grid-template-columns: repeat(3, 1fr); }
 .meal-options button { display: flex; height: 45px; align-items: center; justify-content: center; gap: 5px; font-size: 10px; }
 .meal-options button span { font-size: 15px; }
+.review-field { display: flex; flex-direction: column; margin-top: 18px; }
+.review-field > span { margin-bottom: 8px; font-size: 10px; font-weight: 900; }
+.review-field textarea { min-height: 126px; resize: vertical; padding: 13px 14px; border: 1px solid #dfe4df; border-radius: 15px; outline: none; background: #fafbf9; color: var(--ink); font: inherit; line-height: 1.65; }
+.review-field textarea:focus { border-color: var(--green-2); box-shadow: 0 0 0 3px rgba(89,145,105,.12); }
+.review-field small { align-self: flex-end; margin-top: 5px; color: #929a94; font-size: 8px; }
+.share-review-actions { display: grid; grid-template-columns: .8fr 1.2fr; gap: 9px; margin-top: 15px; }
+.share-review-actions button { height: 48px; border: 1px solid #dfe4df; border-radius: 14px; background: white; color: #657168; font-size: 10px; font-weight: 900; cursor: pointer; }
+.share-review-actions button:last-child { border-color: var(--green); background: var(--green); color: white; }
+.share-review-actions button:disabled { cursor: wait; opacity: .6; }
 
 .bottom-nav { position: fixed; z-index: 30; right: 0; bottom: 0; left: 0; display: grid; width: 100%; max-width: 480px; height: 80px; grid-template-columns: repeat(5, 1fr); margin: 0 auto; padding: 8px 10px max(8px, env(safe-area-inset-bottom)); border-top: 1px solid rgba(224,228,222,.9); background: rgba(255,255,255,.94); backdrop-filter: blur(18px); }
 .bottom-nav button { display: flex; align-items: center; flex-direction: column; justify-content: center; gap: 3px; border: 0; background: transparent; color: #929a94; cursor: pointer; }
@@ -703,6 +720,6 @@ a { color: inherit; text-decoration: none; }
   .page-backdrop { padding: 26px 0; }
   .app-shell { min-height: calc(100dvh - 52px); border-radius: 32px; }
   .bottom-nav { bottom: 26px; border-radius: 0 0 32px 32px; }
-  .recipe-sheet, .schedule-sheet { margin-bottom: 26px; border-radius: 28px; }
+  .recipe-sheet, .schedule-sheet, .share-review-sheet { margin-bottom: 26px; border-radius: 28px; }
   .recipe-hero .meal-visual.large { border-radius: 28px 28px 0 0; }
 }

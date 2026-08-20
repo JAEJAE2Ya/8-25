@@ -190,6 +190,10 @@ export default function Home() {
   const [userFoods, setUserFoods] = useState<UserCreatedFood[]>([]);
   const [creatingUserFood, setCreatingUserFood] = useState(false);
   const [sharingEntryId, setSharingEntryId] = useState<string | null>(null);
+  const [availableIngredients, setAvailableIngredients] = useState("");
+  const [shareReviewMeal, setShareReviewMeal] = useState<Meal | null>(null);
+  const [shareReviewDraft, setShareReviewDraft] = useState("");
+  const [sharingMeal, setSharingMeal] = useState(false);
   const [userFoodDraft, setUserFoodDraft] = useState({ name: "", amount: "100", unit: "g", calories: "", carbs: "", protein: "", fat: "" });
   const [avoidFoods, setAvoidFoods] = useState("");
   const [toast, setToast] = useState("");
@@ -471,7 +475,7 @@ export default function Home() {
         method: "POST",
         body: JSON.stringify({
           target,
-          preferences: { cuisine: preference, goal, avoidFoods },
+          preferences: { cuisine: preference, goal, avoidFoods, availableIngredients },
           excludeMealNames: plan ? getAllMeals(plan).map((meal) => meal.name) : [],
           variationSeed: globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`,
         }),
@@ -549,14 +553,35 @@ export default function Home() {
     setScheduleOpen(true);
   };
 
-  const shareMeal = async (meal: Meal) => {
+  const openShareReview = (meal: Meal) => {
+    setShareReviewMeal(meal);
+    setShareReviewDraft("");
+  };
+
+  const closeShareReview = () => {
+    if (sharingMeal) return;
+    setShareReviewMeal(null);
+    setShareReviewDraft("");
+  };
+
+  const shareMeal = async () => {
+    if (!shareReviewMeal || sharingMeal) return;
+    const review = shareReviewDraft.trim();
+    if (!review) {
+      setToast("레시피 후기를 입력해 주세요");
+      return;
+    }
+    setSharingMeal(true);
     try {
-      const data = await backendFetch<{ post: CommunityPost }>("/api/community/posts", { method: "POST", body: JSON.stringify({ mealName: meal.name, caption: `${meal.name}, 오늘의 목표 영양소에 딱 맞게 맛있게 먹었어요!`, nutrition: meal.nutrition, recipe: meal }) });
+      const data = await backendFetch<{ post: CommunityPost }>("/api/community/posts", { method: "POST", body: JSON.stringify({ mealName: shareReviewMeal.name, caption: review, nutrition: shareReviewMeal.nutrition, recipe: shareReviewMeal }) });
       setCommunity((items) => [data.post, ...items]);
+      setShareReviewMeal(null);
+      setShareReviewDraft("");
       setSelectedMeal(null);
       setScreen("community");
-      setToast("커뮤니티에 레시피를 공유했어요");
+      setToast("후기와 함께 레시피를 공유했어요");
     } catch { setToast("커뮤니티 공유에 실패했어요"); }
+    finally { setSharingMeal(false); }
   };
 
   const shareFoodEntry = async (entry: FoodEntry) => {
@@ -869,6 +894,7 @@ export default function Home() {
               <div className="section-heading"><div><span className="section-kicker">TASTE</span><h2>어떤 식단이 좋으세요?</h2></div></div>
               <div className="chip-group">{["한식", "간단한 요리", "저렴하게", "아무거나"].map((item) => <button key={item} onClick={() => setPreference(item)} className={preference === item ? "active" : ""}>{item}</button>)}</div>
               <div className="chip-group secondary">{["고단백", "균형식", "저탄수", "다이어트", "재료 최소화"].map((item) => <button key={item} onClick={() => setGoal(item)} className={goal === item ? "active" : ""}>{item}</button>)}</div>
+              <label className="pantry-input"><span><b>집에 있는 식재료</b><em>AI가 먼저 활용해요</em></span><textarea value={availableIngredients} maxLength={300} onChange={(event) => setAvailableIngredients(event.target.value)} placeholder="예: 달걀 4개, 바나나 2개, 오트밀, 김치" /><small>쉼표나 줄바꿈으로 구분해 주세요. 비워두어도 괜찮아요.</small></label>
               <label className="avoid-food-input"><span>피하고 싶은 음식이 있나요?</span><input value={avoidFoods} onChange={(event) => setAvoidFoods(event.target.value)} placeholder="예: 버섯, 가지 (선택)" /></label>
             </section>
             <button className="primary-cta" onClick={generatePlan}><span>✦</span> 3일 메뉴 추천받기 <b>→</b></button>
@@ -1077,10 +1103,23 @@ export default function Home() {
                 <section className="recipe-section"><div className="section-heading"><h3>필요한 재료</h3><span>1인분 기준</span></div>{selectedMeal.ingredients.map((ingredient) => <div className="ingredient-row" key={`${ingredient.name}-${ingredient.amount}`}><div><i className={ingredient.category} /><span>{ingredient.name}</span><b>{ingredient.amount}</b></div><a href={getIngredientPurchaseUrl(ingredient.name)} target="_blank" rel="noreferrer">쿠팡에서 찾기 ↗</a></div>)}</section>
                 <section className="recipe-section instructions"><div className="section-heading"><h3>이렇게 만들어요</h3></div>{selectedMeal.instructions.map((instruction, index) => <div className="instruction-row" key={instruction}><span>{index + 1}</span><p>{instruction}</p></div>)}</section>
                 <p className="estimate-note centered">영양 정보는 재료와 조리법에 따른 추정치입니다.</p>
-                <div className="recipe-secondary-actions"><button onClick={() => toggleFavorite(selectedMeal.id)}>{favorites.includes(selectedMeal.id) ? "♥ 저장됨" : "♡ 즐겨찾기"}</button><button onClick={() => shareMeal(selectedMeal)}>♧ 커뮤니티 공유</button></div>
+                <div className="recipe-secondary-actions"><button onClick={() => toggleFavorite(selectedMeal.id)}>{favorites.includes(selectedMeal.id) ? "♥ 저장됨" : "♡ 즐겨찾기"}</button><button onClick={() => openShareReview(selectedMeal)}>♧ 후기와 함께 공유</button></div>
                 <button className="primary-cta schedule-cta" onClick={() => { setEditingPlannedId(null); setCommunitySchedulePostId(null); setScheduleOpen(true); }}>이 메뉴 먹을래요</button>
               </div>
             </div>
+          </div>
+        )}
+
+        {shareReviewMeal && (
+          <div className="modal-layer share-review-layer" role="dialog" aria-modal="true" aria-label={`${shareReviewMeal.name} 후기 작성`}>
+            <button className="modal-scrim" onClick={closeShareReview} aria-label="후기 작성 창 닫기" />
+            <form className="share-review-sheet" onSubmit={(event) => { event.preventDefault(); void shareMeal(); }}>
+              <div className="sheet-handle" />
+              <div className="sheet-heading"><div><span>레시피 공유</span><h2>어땠는지 알려주세요</h2></div><button type="button" onClick={closeShareReview}>×</button></div>
+              <div className="selected-meal-chip"><span>{shareReviewMeal.emoji}</span><div><b>{shareReviewMeal.name}</b><em>{shareReviewMeal.nutrition.calories} kcal</em></div></div>
+              <label className="review-field"><span>나의 후기</span><textarea autoFocus required maxLength={500} value={shareReviewDraft} onChange={(event) => setShareReviewDraft(event.target.value)} placeholder="맛, 조리 난이도, 다음에 바꾸고 싶은 점을 자유롭게 적어보세요." /><small>{shareReviewDraft.length} / 500</small></label>
+              <div className="share-review-actions"><button type="button" onClick={closeShareReview} disabled={sharingMeal}>취소</button><button type="submit" disabled={sharingMeal || !shareReviewDraft.trim()}>{sharingMeal ? "공유 중…" : "후기와 함께 공유"}</button></div>
+            </form>
           </div>
         )}
 
