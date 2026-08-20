@@ -15,6 +15,8 @@ const userFoodDto = (food: { id: string; name: string; manufacturer: string | nu
   source: "user",
 });
 
+const normalizeFoodName = (name: string) => name.trim().toLocaleLowerCase("ko-KR");
+
 export function registerFoodRoutes(app: FastifyInstance, db: PrismaClient, config: AppConfig) {
   app.get("/api/foods/search", async (request, reply) => {
     const user = await requireAuth(request, reply, db, config);
@@ -43,18 +45,26 @@ export function registerFoodRoutes(app: FastifyInstance, db: PrismaClient, confi
     if (!user) return;
     const body = asObject(request.body);
     const nutrition = asObject(body.nutrition);
-    const food = await db.userFood.create({
-      data: {
+    const name = requiredString(body, "name", 200);
+    const normalizedName = normalizeFoodName(name);
+    const foodData = {
+      name,
+      normalizedName,
+      manufacturer: optionalString(body, "manufacturer", 200),
+      referenceAmount: requiredNumber(body, "referenceAmount", 0.01, 100_000),
+      servingUnit: requiredString(body, "unit", 20),
+      calories: requiredNumber(nutrition, "calories", 0, 100_000),
+      carbs: requiredNumber(nutrition, "carbs", 0, 10_000),
+      protein: requiredNumber(nutrition, "protein", 0, 10_000),
+      fat: requiredNumber(nutrition, "fat", 0, 10_000),
+    };
+    const food = await db.userFood.upsert({
+      where: { userId_normalizedName: { userId: user.id, normalizedName } },
+      create: {
         userId: user.id,
-        name: requiredString(body, "name", 200),
-        manufacturer: optionalString(body, "manufacturer", 200),
-        referenceAmount: requiredNumber(body, "referenceAmount", 0.01, 100_000),
-        servingUnit: requiredString(body, "unit", 20),
-        calories: requiredNumber(nutrition, "calories", 0, 100_000),
-        carbs: requiredNumber(nutrition, "carbs", 0, 10_000),
-        protein: requiredNumber(nutrition, "protein", 0, 10_000),
-        fat: requiredNumber(nutrition, "fat", 0, 10_000),
+        ...foodData,
       },
+      update: foodData,
     });
     return reply.code(201).send({ food: userFoodDto(food) });
   });

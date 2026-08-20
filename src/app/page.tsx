@@ -53,6 +53,19 @@ function toTargetDraft(target: Nutrition): TargetDraft {
   ) as TargetDraft;
 }
 
+function dedupeFoods<T extends FoodSearchResult>(foods: T[]): T[] {
+  const seen = new Set<string>();
+  return foods.filter((food) => {
+    const normalizedName = food.name.trim().toLocaleLowerCase("ko-KR");
+    const key = food.source === "user-created"
+      ? `user-created:${normalizedName}`
+      : `${food.source}:${food.id}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 function aiReasonMessage(reason: string | null) {
   if (reason === "missing_api_key") return "Vercel에 OPENAI_API_KEY가 없어 데모 식단을 표시했어요.";
   if (reason === "openai_auth") return "OpenAI API 키가 유효하지 않거나 권한이 없어요. Vercel 환경 변수를 확인해 주세요.";
@@ -175,6 +188,8 @@ export default function Home() {
   const [favoriteFoods, setFavoriteFoods] = useState<FoodSearchResult[]>([]);
   const [recentFoods, setRecentFoods] = useState<RecentFood[]>([]);
   const [userFoods, setUserFoods] = useState<UserCreatedFood[]>([]);
+  const [creatingUserFood, setCreatingUserFood] = useState(false);
+  const [sharingEntryId, setSharingEntryId] = useState<string | null>(null);
   const [userFoodDraft, setUserFoodDraft] = useState({ name: "", amount: "100", unit: "g", calories: "", carbs: "", protein: "", fat: "" });
   const [avoidFoods, setAvoidFoods] = useState("");
   const [toast, setToast] = useState("");
@@ -216,7 +231,7 @@ export default function Home() {
         setFavoriteFoods(favoriteFoodData.foods.map(toFood));
         setFavorites(favoriteRecipeData.recipes.map((recipe) => recipe.externalId ?? recipe.id));
         setFavoriteRecipeIds(Object.fromEntries(favoriteRecipeData.recipes.map((recipe) => [recipe.externalId ?? recipe.id, recipe.favoriteId])));
-        setUserFoods(userFoodData.foods.map(toUserFood));
+        setUserFoods(dedupeFoods(userFoodData.foods.map(toUserFood)));
         setRecentFoods(recentFoodData.foods.map((food, index) => ({ food: toFood(food), count: 1, lastUsedAt: new Date(Date.now() - index).toISOString() })));
         setCommunity(communityData.posts);
       } catch (error) {
@@ -262,11 +277,11 @@ export default function Home() {
       setSearching(true);
       try {
         const data = await backendFetch<{ foods?: BackendFood[]; warning?: string }>(`/api/foods/search?q=${encodeURIComponent(query)}`, { signal: controller.signal });
-        setSearchResults(rankFoods([...(data.foods ?? []).map(toFood), ...userFoods], query));
+        setSearchResults(rankFoods(dedupeFoods((data.foods ?? []).map(toFood)), query));
         setSearchWarning(data.warning ? "식약처 음식 정보를 불러오지 못해 직접 등록한 음식만 보여드려요." : "");
       } catch (error) {
         if (error instanceof DOMException && error.name === "AbortError") return;
-        setSearchResults(rankFoods(userFoods, query));
+        setSearchResults(rankFoods(dedupeFoods(userFoods), query));
         setSearchWarning("음식 정보를 불러오지 못했어요. 최근 음식이나 직접 등록을 이용해 주세요.");
       } finally {
         setSearching(false);
@@ -424,6 +439,7 @@ export default function Home() {
   };
 
   const createUserFood = async () => {
+    if (creatingUserFood) return;
     const amount = Math.max(1, Number.parseFloat(userFoodDraft.amount) || 100);
     if (!userFoodDraft.name.trim()) {
       setToast("음식 이름을 입력해 주세요");
@@ -435,13 +451,15 @@ export default function Home() {
         protein: Math.max(0, Number.parseFloat(userFoodDraft.protein) || 0),
         fat: Math.max(0, Number.parseFloat(userFoodDraft.fat) || 0),
     };
+    setCreatingUserFood(true);
     try {
       const data = await backendFetch<{ food: BackendFood }>("/api/foods/user", { method: "POST", body: JSON.stringify({ name: userFoodDraft.name.trim(), referenceAmount: amount, unit: userFoodDraft.unit, nutrition }) });
       const food = toUserFood(data.food);
-      setUserFoods((items) => [food, ...items]);
+      setUserFoods((items) => dedupeFoods([food, ...items]));
       setUserFoodDraft({ name: "", amount: "100", unit: "g", calories: "", carbs: "", protein: "", fat: "" });
       selectFood(food);
     } catch { setToast("직접 등록 음식을 저장하지 못했어요"); }
+    finally { setCreatingUserFood(false); }
   };
 
   const generatePlan = async () => {
@@ -542,12 +560,24 @@ export default function Home() {
   };
 
   const shareFoodEntry = async (entry: FoodEntry) => {
+    if (sharingEntryId) return;
+    setSharingEntryId(entry.id);
+    let persistedEntry = entry;
+    let persistedDraft = false;
     try {
-      const data = await backendFetch<{ post: CommunityPost }>("/api/community/posts", { method: "POST", body: JSON.stringify({ foodEntryId: entry.id, caption: `${entry.foodName}, 오늘 맛있게 먹었어요!` }) });
+      if (entry.id.startsWith("temp-")) {
+        const saved = await backendFetch<{ entry: FoodEntry }>("/api/diary/entries", { method: "POST", body: JSON.stringify(entry) });
+        persistedEntry = saved.entry;
+        persistedDraft = true;
+        setEditingEntries((items) => items.map((item) => item.id === entry.id ? persistedEntry : item));
+        setEntries((items) => [...items.filter((item) => item.id !== entry.id && item.id !== persistedEntry.id), persistedEntry]);
+      }
+      const data = await backendFetch<{ post: CommunityPost }>("/api/community/posts", { method: "POST", body: JSON.stringify({ foodEntryId: persistedEntry.id, caption: `${persistedEntry.foodName}, 오늘 맛있게 먹었어요!` }) });
       setCommunity((items) => [data.post, ...items]);
       setScreen("community");
       setToast("먹은 식사를 커뮤니티에 공유했어요");
-    } catch { setToast("섭취 기록을 공유하지 못했어요"); }
+    } catch { setToast(persistedDraft ? "섭취 기록은 저장했지만 커뮤니티에 공유하지 못했어요" : "섭취 기록을 공유하지 못했어요"); }
+    finally { setSharingEntryId(null); }
   };
 
   const mealFromPost = (post: CommunityPost): Meal => post.recipe ?? {
@@ -797,7 +827,7 @@ export default function Home() {
             <div className="section-heading"><h2>먹은 음식</h2><span>{editingEntries.length}개</span></div>
             {editingEntries.length ? editingEntries.map((entry) => <article key={entry.id}><div><span>{entry.manufacturer ?? "섭취 기록"}</span><h3>{entry.foodName}</h3><p>{entry.amount}{entry.unit} · 탄 {entry.nutrition.carbs}g · 단 {entry.nutrition.protein}g · 지 {entry.nutrition.fat}g</p></div><strong>{entry.nutrition.calories} kcal</strong><button onClick={() => setEditingEntries((current) => current.filter((item) => item.id !== entry.id))} aria-label={`${entry.foodName} 삭제`}>×</button></article>) : <div className="meal-editor-empty"><span>＋</span><p>아직 담은 음식이 없어요.</p></div>}
           </section>
-          {editingEntries.some((entry) => !entry.id.startsWith("temp-")) && <div className="entry-share-list">{editingEntries.filter((entry) => !entry.id.startsWith("temp-")).map((entry) => <button key={entry.id} className="outline-cta" onClick={() => shareFoodEntry(entry)}>♧ {entry.foodName} 커뮤니티에 공유</button>)}</div>}
+          {editingEntries.length > 0 && <div className="entry-share-list">{editingEntries.map((entry) => <button key={entry.id} className="outline-cta" disabled={sharingEntryId !== null} onClick={() => shareFoodEntry(entry)}>♧ {entry.foodName} {entry.id.startsWith("temp-") ? "저장 후 공유" : "커뮤니티에 공유"}</button>)}</div>}
           <div className="meal-editor-actions"><button className="outline-cta" onClick={() => startFoodSearch(activeMealType, true)}>＋ 음식 추가</button><button className="primary-cta compact" onClick={saveMealEntries}>수정 완료</button></div>
         </main>
       </>
@@ -813,7 +843,7 @@ export default function Home() {
           <label><span>음식 이름</span><input value={userFoodDraft.name} onChange={(event) => setUserFoodDraft({ ...userFoodDraft, name: event.target.value })} placeholder="예: 엄마표 닭볶음탕" /></label>
           <div className="create-food-grid"><label><span>기준량</span><input inputMode="decimal" value={userFoodDraft.amount} onChange={(event) => /^\d*\.?\d*$/.test(event.target.value) && setUserFoodDraft({ ...userFoodDraft, amount: event.target.value })} /></label><label><span>단위</span><select value={userFoodDraft.unit} onChange={(event) => setUserFoodDraft({ ...userFoodDraft, unit: event.target.value })}><option value="g">g</option><option value="ml">ml</option><option value="개">개</option><option value="인분">인분</option></select></label></div>
           {(["calories", "carbs", "protein", "fat"] as const).map((key, index) => <label key={key}><span>{["칼로리", "탄수화물", "단백질", "지방"][index]}</span><div><input inputMode="decimal" value={userFoodDraft[key]} onChange={(event) => /^\d*\.?\d*$/.test(event.target.value) && setUserFoodDraft({ ...userFoodDraft, [key]: event.target.value })} placeholder="0" /><em>{key === "calories" ? "kcal" : "g"}</em></div></label>)}
-          <button className="primary-cta compact" onClick={createUserFood}>저장하고 섭취량 선택하기</button>
+          <button className="primary-cta compact" disabled={creatingUserFood} onClick={createUserFood}>{creatingUserFood ? "저장 중…" : "저장하고 섭취량 선택하기"}</button>
         </section>
       </main>
     </>

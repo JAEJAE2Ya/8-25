@@ -214,6 +214,7 @@ a { color: inherit; text-decoration: none; }
 .chip-group button { padding: 10px 15px; border: 1px solid #e0e5df; border-radius: 99px; background: white; color: #6f7a72; font-size: 11px; cursor: pointer; }
 .chip-group button.active { border-color: var(--green); background: var(--green); color: white; font-weight: 800; }
 .primary-cta { display: flex; width: 100%; height: 57px; align-items: center; justify-content: center; gap: 9px; margin-top: 27px; border: 0; border-radius: 17px; background: var(--green); color: white; box-shadow: 0 13px 25px rgba(22,63,45,.18); font-size: 14px; font-weight: 800; cursor: pointer; }
+.primary-cta:disabled, .outline-cta:disabled { cursor: wait; opacity: .65; }
 .primary-cta span, .primary-cta b { color: var(--lime); }
 .primary-cta b { margin-left: auto; margin-right: 20px; }
 .cta-helper { margin: 10px 0 0; color: #919891; text-align: center; font-size: 9px; }
